@@ -14,3 +14,4 @@ build/
 .codeassistant/*
 !.codeassistant/my-experts/
 !.codeassistant/skills/
+.idea/

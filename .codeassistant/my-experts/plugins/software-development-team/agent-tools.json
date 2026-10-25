@@ -1,0 +1,23 @@
+{
+  "sdt-architect": {
+    "skills": ["code-stats"]
+  },
+  "sdt-backend": {
+    "skills": ["code-stats", "commit-message"]
+  },
+  "sdt-frontend": {
+    "skills": ["code-stats", "commit-message"]
+  },
+  "sdt-qa": {
+    "skills": ["code-stats"]
+  },
+  "sdt-devops": {
+    "skills": ["code-stats", "commit-message"]
+  },
+  "sdt-requirement": {
+    "skills": []
+  },
+  "software-development-team-team-lead": {
+    "skills": ["commit-message"]
+  }
+}
