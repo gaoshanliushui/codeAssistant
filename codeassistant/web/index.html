@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CodeAssistant · 多专家代码助手</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #171a23;
+    --panel-2: #1e222d;
+    --border: #2a2f3d;
+    --text: #e6e8ef;
+    --muted: #8b93a7;
+    --accent: #5b8cff;
+    --accent-2: #7c5cff;
+    --ok: #3ecf8e;
+    --warn: #f5a524;
+    --danger: #f2555a;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    display: grid; grid-template-columns: 320px 1fr; height: 100vh; overflow: hidden;
+  }
+  @media (max-width: 900px) { body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } }
+
+  /* ---------- 侧栏 ---------- */
+  aside {
+    background: var(--panel); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .brand { padding: 18px 18px 12px; border-bottom: 1px solid var(--border); }
+  .brand h1 { margin: 0; font-size: 16px; letter-spacing: .3px; }
+  .brand p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+  .catalog { overflow-y: auto; padding: 12px 10px 24px; flex: 1; min-height: 0; }
+  .catalog h2 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted); margin: 14px 8px 6px;
+  }
+  .item {
+    padding: 9px 10px; border-radius: 9px; cursor: pointer;
+    border: 1px solid transparent; transition: .15s;
+  }
+  .item:hover { background: var(--panel-2); }
+  .item.active { border-color: var(--accent); background: var(--panel-2); }
+  .item .name { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .item .meta { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+  .badge {
+    font-size: 10px; padding: 1px 6px; border-radius: 20px;
+    background: rgba(91,140,255,.16); color: #9db8ff; border: 1px solid rgba(91,140,255,.3);
+  }
+  .badge.team { background: rgba(124,92,255,.16); color: #b8a5ff; border-color: rgba(124,92,255,.32); }
+
+  /* ---------- 主区 ---------- */
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  header {
+    padding: 12px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; background: var(--panel);
+  }
+  header .target { font-size: 13px; color: var(--muted); }
+  header .target b { color: var(--text); }
+  header .spacer { flex: 1; }
+  button.ghost {
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    padding: 5px 11px; border-radius: 8px; cursor: pointer; font-size: 12px;
+  }
+  button.ghost:hover { color: var(--text); border-color: var(--muted); }
+
+  #log { flex: 1; overflow-y: auto; padding: 20px; min-height: 0; }
+  .msg { max-width: 900px; margin: 0 auto 18px; }
+  .msg .who { font-size: 11px; color: var(--muted); margin-bottom: 5px; letter-spacing: .5px; }
+  .bubble {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 13px 15px; white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .bubble.user { background: rgba(91,140,255,.12); border-color: rgba(91,140,255,.35); }
+  .bubble.error { background: rgba(242,85,90,.12); border-color: rgba(242,85,90,.4); }
+
+  /* ---------- 专家卡片 ---------- */
+  .cards { max-width: 900px; margin: 0 auto 18px; display: grid; gap: 10px;
+           grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 11px 13px; position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--border);
+  }
+  .card.running::before { background: var(--accent); }
+  .card.done::before { background: var(--ok); }
+  .card.waiting::before { background: var(--warn); }
+  .card.failed::before { background: var(--danger); }
+  .card .t { font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+  .card .t span:last-child { font-size: 11px; color: var(--muted); font-weight: 400; }
+  .card .d { color: var(--muted); font-size: 12px; margin-top: 5px; min-height: 18px;
+             white-space: pre-wrap; word-break: break-word; }
+
+  /* ---------- 审批 ---------- */
+  .approval {
+    max-width: 900px; margin: 0 auto 18px; border: 1px solid var(--warn);
+    background: rgba(245,165,36,.1); border-radius: var(--radius); padding: 14px 16px;
+  }
+  .approval .t { font-weight: 700; color: var(--warn); margin-bottom: 8px; }
+  .approval pre {
+    margin: 8px 0 12px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; font-size: 12px; overflow-x: auto;
+    max-height: 220px; white-space: pre-wrap; word-break: break-all;
+  }
+  .approval .row { display: flex; gap: 9px; }
+  button.primary { background: var(--ok); color: #06281a; border: 0; padding: 7px 16px;
+                   border-radius: 8px; font-weight: 700; cursor: pointer; }
+  button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger);
+                  padding: 7px 16px; border-radius: 8px; cursor: pointer; }
+
+  footer { border-top: 1px solid var(--border); background: var(--panel); padding: 12px 20px; }
+  .composer { max-width: 900px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
+  textarea {
+    flex: 1; resize: none; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 10px; padding: 11px 13px;
+    font: inherit; min-height: 46px; max-height: 180px;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  button.send { background: var(--accent); color: #fff; border: 0; padding: 12px 22px;
+                border-radius: 10px; font-weight: 700; cursor: pointer; }
+  button.send:disabled { opacity: .45; cursor: not-allowed; }
+  .hint { max-width: 900px; margin: 7px auto 0; color: var(--muted); font-size: 11.5px; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+         background: var(--muted); margin-right: 6px; vertical-align: middle; }
+  .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+</style>
+</head>
+<body>
+  <aside>
+    <div class="brand">
+      <h1>CodeAssistant</h1>
+      <p id="healthline">正在连接…</p>
+    </div>
+    <div class="catalog" id="catalog"></div>
+  </aside>
+
+  <main>
+    <header>
+      <div class="target">当前目标：<b id="targetName">自动路由</b></div>
+      <div class="spacer"></div>
+      <button class="ghost" id="reloadBtn">热重载专家包</button>
+    </header>
+
+    <div id="log"></div>
+
+    <footer>
+      <div class="composer">
+        <textarea id="input" rows="1" placeholder="描述你的任务…（Enter 发送，Shift+Enter 换行）"></textarea>
+        <button class="send" id="sendBtn">发送</button>
+      </div>
+      <div class="hint" id="hint">左侧选择专家或专家团可跳过自动路由；高危操作会暂停等待人工审批。</div>
+    </footer>
+  </main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const log = $("log");
+const cards = new Map();
+let target = { expert: null, team: null };
+let busy = false;
+
+function el(tag, cls, html) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (html !== undefined) n.innerHTML = html;
+  return n;
+}
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+}
+function scroll() { log.scrollTop = log.scrollHeight; }
+
+function addMessage(who, text, cls) {
+  const wrap = el("div", "msg");
+  wrap.appendChild(el("div", "who", esc(who)));
+  wrap.appendChild(el("div", "bubble " + (cls || ""), esc(text)));
+  log.appendChild(wrap);
+  scroll();
+  return wrap;
+}
+
+function cardFor(name, kind) {
+  let c = cards.get(name);
+  if (c) return c;
+  c = el("div", "card");
+  c.innerHTML = `<div class="t"><span>${esc(name)}</span><span></span></div><div class="d"></div>`;
+  log.appendChild(c);
+  cards.set(name, c);
+  scroll();
+  return c;
+}
+
+function updateCard(name, status, detail, kind) {
+  const c = cardFor(name, kind);
+  c.className = "card " + status;
+  c.querySelector(".t span:last-child").textContent = detail.label || "";
+  c.querySelector(".d").textContent = detail.text || "";
+}
+
+function showApproval(ev) {
+  const box = el("div", "approval");
+  box.innerHTML = `<div class="t">🔒 需要人工审批 · ${esc(ev.expert || "")}</div>
+    <div>工具：<b>${esc(ev.tool)}</b>　风险：${esc(ev.risk || "high")}</div>
+    ${ev.reason ? `<div style="color:var(--muted);margin-top:4px">${esc(ev.reason)}</div>` : ""}
+    <pre>${esc(JSON.stringify(ev.args || {}, null, 2))}</pre>`;
+  const row = el("div", "row");
+  const ok = el("button", "primary", "允许执行");
+  const no = el("button", "danger", "拒绝");
+  row.appendChild(ok); row.appendChild(no);
+  box.appendChild(row);
+  log.appendChild(box);
+  scroll();
+
+  const decide = async (approved, reason) => {
+    ok.disabled = no.disabled = true;
+    await fetch("/api/approvals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ request_id: ev.request_id, approved, reason })
+    });
+    box.querySelector(".t").textContent = approved ? "✅ 已允许执行" : "🚫 已拒绝";
+  };
+  ok.onclick = () => decide(true, "Web 界面确认");
+  no.onclick = () => decide(false, "Web 界面拒绝");
+}
+
+function handleEvent(ev) {
+  const p = ev.payload || {};
+  switch (ev.type) {
+    case "orchestrator_route":
+      $("targetName").textContent = `${p.route} → ${p.target}`;
+      if (p.target) updateCard(p.target, "running", { label: "被路由到", text: p.reason || "" });
+      break;
+    case "expert_plan":
+      updateCard(ev.expert, "running", { label: "规划中", text: (p.text || "").slice(0, 220) });
+      break;
+    case "expert_tool_call":
+      updateCard(ev.expert, "running", { label: "调用工具", text: `${p.tool} ${JSON.stringify(p.args || {}).slice(0, 160)}` });
+      break;
+    case "expert_tool_result":
+      updateCard(ev.expert, "running", { label: "工具返回", text: String(p.text || "").slice(0, 220) });
+      break;
+    case "expert_completed":
+      updateCard(ev.expert, p.status === "failed" ? "failed" : "done",
+                 { label: p.status || "完成", text: String(p.text || "").slice(0, 400) });
+      break;
+    case "team_dispatch":
+      updateCard(ev.team, "running", { label: `第 ${p.round} 轮 → ${p.member}`, text: p.reason || "" });
+      updateCard(p.member, "waiting", { label: "被派活", text: p.reason || "" });
+      break;
+    case "team_completed":
+      updateCard(ev.team, "done", { label: "团队完成", text: String(p.text || "").slice(0, 400) });
+      break;
+    case "approval_required":
+      showApproval(ev);
+      break;
+    case "run_completed":
+      addMessage("最终结论", p.text || "", p.status === "failed" ? "error" : "");
+      break;
+    case "error":
+      addMessage("错误", p.message || "未知错误", "error");
+      break;
+  }
+}
+
+async function send() {
+  const text = $("input").value.trim();
+  if (!text || busy) return;
+  busy = true; $("sendBtn").disabled = true;
+  $("input").value = "";
+  addMessage("你", text, "user");
+
+  const body = { task: text, session_id: null, expert: target.expert, team: target.team, mode: null };
+
+  try {
+    const resp = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const parts = buf.split("\n\n");
+      buf = parts.pop();
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (payload === "[DONE]") continue;
+        try { handleEvent(JSON.parse(payload)); } catch (e) { console.error(e); }
+      }
+    }
+  } catch (err) {
+    addMessage("错误", String(err), "error");
+  } finally {
+    busy = false; $("sendBtn").disabled = false; $("input").focus();
+  }
+}
+
+function selectExpert(name) {
+  target = { expert: name, team: null };
+  $("targetName").textContent = "专家 · " + name;
+  document.querySelectorAll(".item").forEach(n => n.classList.remove("active"));
+  log.innerHTML = ""; cards.clear();
+}
+
+function selectTeam(name) {
+  target = { expert: null, team: name };
+  $("targetName").textContent = "专家团 · " + name;
+  document.querySelectorAll(".item").forEach(n => n.classList.remove("active"));
+  log.innerHTML = ""; cards.clear();
+}
+
+async function loadCatalog() {
+  const cat = await (await fetch("/api/catalog")).json();
+  const box = $("catalog");
+  box.innerHTML = "";
+
+  const teamH = el("h2", null, "专家团");
+  box.appendChild(teamH);
+  (cat.teams || []).forEach(t => {
+    const it = el("div", "item");
+    it.innerHTML = `<div class="name">${esc(t.display_name || t.name)} <span class="badge team">${esc(t.mode)}</span></div>
+      <div class="meta">${esc(t.name)} · ${esc(t.lead)}</div>`;
+    it.onclick = () => { selectTeam(t.name); document.querySelectorAll(".item").forEach(n => n.classList.remove("active")); it.classList.add("active"); };
+    box.appendChild(it);
+  });
+
+  const expH = el("h2", null, "专家");
+  box.appendChild(expH);
+  (cat.experts || []).forEach(e => {
+    const it = el("div", "item");
+    it.innerHTML = `<div class="name">${esc(e.display_name || e.name)}</div>
+      <div class="meta">${esc(e.name)} · ${esc(e.profession || "")}</div>`;
+    it.onclick = () => { selectExpert(e.name); document.querySelectorAll(".item").forEach(n => n.classList.remove("active")); it.classList.add("active"); };
+    box.appendChild(it);
+  });
+}
+
+async function loadHealth() {
+  try {
+    const h = await (await fetch("/api/health")).json();
+    $("healthline").innerHTML = `<span class="dot on"></span>${esc(h.provider)} / ${esc(h.model)} · ${esc(h.workspace)}`;
+  } catch (e) {
+    $("healthline").textContent = "后端未连接";
+  }
+}
+
+$("sendBtn").onclick = send;
+$("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$("input").addEventListener("input", (e) => {
+  e.target.style.height = "auto";
+  e.target.style.height = Math.min(e.target.scrollHeight, 180) + "px";
+});
+$("reloadBtn").onclick = async () => {
+  const r = await (await fetch("/api/reload", { method: "POST" })).json();
+  $("hint").textContent = "热重载：" + r.summary;
+  await loadCatalog();
+};
+
+loadHealth();
+loadCatalog();
+$("input").focus();
+</script>
+</body>
+</html>

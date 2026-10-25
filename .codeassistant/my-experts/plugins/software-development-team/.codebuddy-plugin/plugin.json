@@ -1,0 +1,122 @@
+{
+  "name": "software-development-team",
+  "version": "1.0.0",
+  "description": "End-to-end software delivery team — requirements, architecture, frontend, backend, QA, and DevOps, orchestrated by a delivery director for quality and pace.",
+  "author": {
+    "name": "风中劲草哈",
+    "email": "noreply@example.com"
+  },
+  "agents": [
+    "./agents/software-development-team-team-lead.md",
+    "./agents/sdt-requirement.md",
+    "./agents/sdt-architect.md",
+    "./agents/sdt-frontend.md",
+    "./agents/sdt-backend.md",
+    "./agents/sdt-qa.md",
+    "./agents/sdt-devops.md"
+  ],
+
+  "expertType": "team",
+  "agentName": "software-development-team-team-lead",
+  "teamInfo": {
+    "leadAgent": "software-development-team-team-lead",
+    "memberAgents": [
+      "sdt-requirement",
+      "sdt-architect",
+      "sdt-frontend",
+      "sdt-backend",
+      "sdt-qa",
+      "sdt-devops"
+    ]
+  },
+
+  "displayName": {
+    "en": "Software Development Team",
+    "zh": "软件开发专家团"
+  },
+  "profession": {
+    "en": "Software Development Team",
+    "zh": "软件开发专家团"
+  },
+  "displayDescription": {
+    "en": "End-to-end software delivery team — requirements, architecture, frontend, backend, testing, and DevOps, orchestrated by a delivery director for quality and pace.",
+    "zh": "端到端软件交付专家团，需求、架构、前后端、测试、运维六角色，由交付总监主理、把控节奏与质量。"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "02-Engineering",
+  "defaultInitPrompt": {
+    "zh": "你好，我是软件开发专家团的交付总监齐活林。请描述你的项目想法或当前遇到的问题，我会判断该走哪条协作流程，并调度最合适的角色为你产出专业方案。",
+    "en": "Hi, I'm Qi Huolin, Delivery Director of the Software Development Team. Describe your project idea or problem, and I'll route the work to the right specialist."
+  },
+  "plugin": "software-development-team",
+  "tags": [
+    { "en": "Full-Stack Delivery", "zh": "全栈交付" },
+    { "en": "Agile Collaboration", "zh": "敏捷协作" },
+    { "en": "Engineering Standards", "zh": "工程规范" }
+  ],
+  "quickPrompts": [
+    {
+      "en": "Hi, I'm Qi Huolin, Delivery Director of the Software Development Team. Describe your project idea or problem, and I'll route the work to the right specialist.",
+      "zh": "你好，我是软件开发专家团的交付总监齐活林。请描述你的项目想法或当前遇到的问题，我会判断该走哪条协作流程，并调度最合适的角色为你产出专业方案。"
+    },
+    {
+      "en": "We're building [product/project] for [user group]. Please draft a complete PRD with user stories and acceptance criteria.",
+      "zh": "我们打算做 [产品/项目]，目标用户是 [群体]，请帮我产出完整的需求文档（PRD）和验收标准。"
+    },
+    {
+      "en": "Our [system] is hitting [symptom] in production. Help me find the root cause and propose a fix plus prevention.",
+      "zh": "线上 [系统名] 出现 [症状]，请帮我定位根因并给出修复与预防方案。"
+    }
+  ],
+  "members": [
+    {
+      "id": "software-development-team-team-lead",
+      "displayName": { "en": "Qi Huolin", "zh": "齐活林" },
+      "profession": { "en": "Delivery Director", "zh": "交付总监" },
+      "avatar": "avatars/software-development-team-team-lead.png",
+      "role": "lead"
+    },
+    {
+      "id": "sdt-requirement",
+      "displayName": { "en": "Xu Qingchu", "zh": "许清楚" },
+      "profession": { "en": "Requirements Analyst", "zh": "需求分析师" },
+      "avatar": "avatars/sdt-requirement.png",
+      "role": "member"
+    },
+    {
+      "id": "sdt-architect",
+      "displayName": { "en": "Gao Jianyuan", "zh": "高见远" },
+      "profession": { "en": "Software Architect", "zh": "架构师" },
+      "avatar": "avatars/sdt-architect.png",
+      "role": "member"
+    },
+    {
+      "id": "sdt-frontend",
+      "displayName": { "en": "Kou Douma", "zh": "寇豆码" },
+      "profession": { "en": "Frontend Engineer", "zh": "前端开发工程师" },
+      "avatar": "avatars/sdt-frontend.png",
+      "role": "member"
+    },
+    {
+      "id": "sdt-backend",
+      "displayName": { "en": "Hou Yunqing", "zh": "候云擎" },
+      "profession": { "en": "Backend Engineer", "zh": "后端开发工程师" },
+      "avatar": "avatars/sdt-backend.png",
+      "role": "member"
+    },
+    {
+      "id": "sdt-qa",
+      "displayName": { "en": "Yan Guoguan", "zh": "严过关" },
+      "profession": { "en": "QA Engineer", "zh": "测试工程师" },
+      "avatar": "avatars/sdt-qa.png",
+      "role": "member"
+    },
+    {
+      "id": "sdt-devops",
+      "displayName": { "en": "Ning Anwen", "zh": "宁安稳" },
+      "profession": { "en": "DevOps Engineer", "zh": "运维工程师" },
+      "avatar": "avatars/sdt-devops.png",
+      "role": "member"
+    }
+  ]
+}

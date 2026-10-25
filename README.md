@@ -1,0 +1,338 @@
+# CodeAssistant · 基于 LangGraph 的多专家代码助手
+
+一套**运行时可动态装配**的多 Agent 编排框架，采用「专家（Expert）— 专家团（Team）— 主编排器（Supervisor）」三层架构，
+在它之上提供了一套真实的代码助手工具链（文件读写、代码检索、命令执行、Git）。
+
+```
+用户请求
+   │
+   ▼
+主编排器 Orchestrator ── 意图路由 ──┬─▶ 专家子图（独立编译 / 独立状态 / 独立检查点）
+   │                                │
+   │                                └─▶ 专家团子图
+   │                                        ├─ Supervisor：主理人按条件边动态分派
+   │                                        └─ Parallel：Send 扇出并行汇
+   │
+   └── 每个成员本身就是一个专家子图（可嵌套）
+```
+
+---
+
+## 快速开始
+
+```bash
+# 1. 安装（pypi.org 直连不通时加镜像）
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -e ".[all,dev]"
+
+# 2. 看看有哪些专家和专家团
+codeassistant experts
+
+# 3. 单次执行（默认 mock 模型，无需任何 API Key）
+codeassistant run "帮我看看这个项目的结构"
+
+# 4. 交互式会话
+codeassistant chat
+
+# 5. 启动 Web 服务
+codeassistant serve --port 8765
+```
+
+接入真实模型：
+
+```bash
+export CODEASSISTANT_PROVIDER=openai
+export CODEASSISTANT_MODEL=deepseek-chat
+export CODEASSISTANT_BASE_URL=https://api.deepseek.com/v1
+export CODEASSISTANT_API_KEY=sk-xxx
+```
+
+`anthropic` 同理（`CODEASSISTANT_MODEL=claude-sonnet-4-5`）。完整配置见 `.env.example`。
+
+---
+
+## 命令
+
+| 命令 | 说明 |
+|------|------|
+| `codeassistant chat` | 交互式会话，高危操作在终端里逐条审批 |
+| `codeassistant run "任务"` | 执行一次任务，`--expert` / `--team` 可跳过路由，`--json` 输出结构化结果 |
+| `codeassistant experts` | 列出所有专家与专家团（含工具白名单与人审点） |
+| `codeassistant reload` | 热重载专家包，变更的专家图自动失效重建 |
+| `codeassistant serve` | 启动 FastAPI + SSE Web 服务 |
+
+全局参数：`--workspace`（沙箱根目录）、`--provider`、`--model`、`--checkpointer`。
+
+---
+
+## 三层架构
+
+### 专家（Expert）—— 独立编译的 LangGraph 子图
+
+每个专家封装成一张**单独编译**的图，拥有独立的 State Schema、Checkpointer 与中断逻辑，
+因此可以脱离主编排器单独编译、单独测试、整体替换。
+
+```
+START → plan → act ─┬─(有工具调用)→ execute_tools → act
+                     └─(无工具调用)→ finalize → END
+```
+
+- 手写 ReAct 循环，不依赖 `create_agent` 预构建，模型后端（OpenAI / Anthropic / Mock）可互换
+- 工具按专家白名单裁剪，命中高危工具时进入人工审批
+- 图工厂以 `(name, config_hash)` 为键缓存已编译的图；配置变更 → hash 变更 → 缓存失效并热更新
+
+### 专家团（Team）—— 专家的编排层
+
+两种协作模式，共享同一套状态协议与成员调用逻辑：
+
+- **Supervisor**：主理人（lead）用 LLM 决定下一位派给谁，成员产出**必须**回传主理人再转交下一位
+  （跨成员信息流一律经主理人中转，成员之间不直连），主理人最终汇编交付报告
+- **Parallel**：`Send` API 把同一任务扇出给所有成员并发执行，reduce 节点汇总
+
+成员在图里是**原生子图节点**（每个成员专家子图直接 `add_node` 进专家团图），
+所以成员内部的人工审批能一路冒泡到前端；并行模式下多个成员同时挂起时，
+用「中断 ID → 审批结论」的映射一次性恢复。
+
+模式可以在专家包里用 `agent-tools.json` 声明（见下），也可以用 `--mode` 临时覆盖。
+
+### 主编排器（Orchestrator）—— 意图路由
+
+只做路由与汇总，不亲自产出专业内容：
+
+| 路由 | 触发条件 |
+|------|----------|
+| `expert` | 命中某个单体专家 |
+| `team` | 命中某个专家团 |
+| `direct` | 没有更合适的专家，交给内置代码助手 |
+
+路由优先用 LLM 判断（工具调用），模型不可用时退回关键词规则，离线也能工作。
+
+---
+
+## 统一契约层
+
+三层之间只通过 `codeassistant/contracts.py` 的协议通信，映射是**显式函数**而非隐式字段透传：
+
+```python
+ExpertInput  = {task, context, upstream, session_id}
+ExpertOutput = {expert, status, summary, artifacts, findings, next_action, turns_used}
+TeamInput    = {task, context, members, mode, session_id}
+TeamOutput   = {team, status, summary, deliverables, transcript, rounds}
+
+team_input_to_expert_input()      # 团级任务 → 成员输入
+expert_output_to_deliverable()    # 成员输出 → 团队交付物
+merge_team_outputs()              # 成员产出 → 团队结论（状态按失败/需人工/部分/成功归并）
+```
+
+---
+
+## 记忆隔离
+
+三层命名空间的 `thread_id`，多用户 / 多专家并行互不干扰：
+
+| 层级 | thread_id | 用途 |
+|------|-----------|------|
+| 会话级 | `s:<session_id>` | 主编排器的路由与总结记忆 |
+| 专家级 | `e:<expert>:<session_id>` | 单个专家跨轮次的记忆 |
+| 团队级 | `t:<team>:<session_id>` | 专家团协作过程的记忆 |
+
+其上再叠加 `checkpoint_ns`，区分同一张图内部的节点。
+
+专家作为**顶层目标**运行时用自己的 thread（`e:<expert>:<session>` + `expert:<name>` 命名空间）；
+作为专家团成员运行时挂在专家团的 thread 下，用 `member__<成员名>` 节点名做命名空间隔离。
+两种情况下成员的检查点都不会互相串。
+
+---
+
+## 人工审批（HITL）
+
+高危工具（`write_file` / `edit_file` / `delete_file` / `run_command`）在执行前会挂起，
+支持两种粒度：
+
+- **dynamic**（默认）：在工具执行节点内逐个调用 `interrupt()`，逐条通过 / 拒绝，
+  被拒的调用记入 `findings` 并继续循环 —— **支持从子图内部断点恢复**
+- **static**：整批工具调用共享**一次** `interrupt()`，一次确认放行全部（或全部拒绝）
+
+### 两阶段：先审批，后执行
+
+工具执行节点内部严格分成两个阶段：
+
+1. **审批阶段** —— 逐个（或整批）请求人工放行，可能在此中断；
+2. **执行阶段** —— 所有审批都通过后才真正执行工具。
+
+这是必须的：LangGraph 恢复被中断的节点时会把整个节点**从头重跑**，
+如果审批与执行交错，已经跑过的工具会被重复执行（重复部署、重复写入…）。
+两阶段分离保证副作用只发生一次。
+
+### 中断如何冒泡
+
+专家团成员、专家团、主编排器之间是**原生子图节点**（`add_node("member__x", expert_graph)`）
+而不是在节点里手工 `ainvoke`。这一点很关键——只有原生子图节点，
+中断才能从成员专家一路冒泡到前端；手工调用时子图的挂起会被静默吞掉，
+父图会误以为成员已经完成。
+
+另外还有一个编译期闸门 `ExpertConfig.interrupt_before_tools`：
+打开后专家图会以 `interrupt_before=["execute_tools"]` 编译，在工具执行节点之前整体暂停一次。
+注意 `interrupt_before` 的暂停**不会**从嵌套子图向上冒泡，
+所以它只建议在「专家作为顶层目标」运行时启用。
+
+CLI 在终端里逐条询问；Web 端弹出审批卡片，POST `/api/approvals` 后从断点继续。
+
+---
+
+## 代码助手工具与沙箱
+
+所有**文件类**工具的路径都被限制在 `--workspace` 指定的根目录内：
+先 `resolve()`（顺带解析符号链接），再校验是否仍在根目录内，越界一律拒绝——
+**即使拿到人工审批也不放行**。`search_code` 也会跳过指向工作区之外的符号链接。
+
+| 工具 | 风险 | 说明 |
+|------|------|------|
+| `read_file` / `list_files` / `search_code` / `ast_inspect` | low | 读文件、列目录、字面量检索、Python AST 解析 |
+| `git_status` / `git_diff` | low | 只读 Git |
+| `write_file` / `edit_file` / `delete_file` | high | 写操作，需审批 |
+| `run_command` | high | 执行 shell，需审批 |
+
+工具白名单在**执行期**同样生效：模型即使幻觉出白名单外的工具名（比如只读专家想调
+`delete_file`），也会被拒绝执行，而不是悄悄放行。
+
+关于 `run_command` 的边界，说清楚一点：
+
+* 工作目录被限制在工作区内；
+* 但**命令本身**不受文件系统沙箱约束（`cat /etc/hosts` 是能读到的）——
+  这是 shell 的固有性质，靠「必须人工审批」这一层来兜底；
+* 另有一层永远禁止的命令黑名单（`rm -rf /`、`mkfs`、fork 炸弹等），
+  即便人工审批通过也不放行。但黑名单只能挡住明显写法，无法穷尽所有变形；
+* 子进程环境变量里的敏感项（名字含 KEY / TOKEN / SECRET / PASSWORD 等）会被剔除，
+  避免 API Key 随命令输出泄露进模型上下文。
+
+---
+
+## 专家包格式
+
+直接复用仓库里已有的 codebuddy 专家包（`.codeassistant/my-experts/plugins/*`），无需改造：
+
+```
+.codeassistant/my-experts/plugins/<plugin>/
+├── .codebuddy-plugin/plugin.json   # 包元数据：expertType / teamInfo / members / displayName …
+├── agents/<agent>.md                # agent 定义：YAML frontmatter + 正文提示词
+└── agent-tools.json                 # （可选）工具绑定与审批策略覆盖
+```
+
+专家包放在 `.codeassistant/` 应用数据目录里（和状态库 `state.db` 同级），
+路径可用 `CODEASSISTANT_EXPERTS_DIR` 覆盖。
+
+`plugin.json` 里 `expertType` 为 `agent` 表示单体专家，为 `team` 表示专家团
+（`teamInfo.leadAgent` + `teamInfo.memberAgents`）。
+
+### 工具绑定策略（三级）
+
+1. 包内 `agent-tools.json` 显式声明（优先级最高）
+2. 按职位关键词的内置映射表（如「后端开发工程师」→ 文件 + 搜索 + 命令执行）
+3. 兜底最小安全集（只读）
+
+```json
+{
+  "sdt-backend": {
+    "tools": ["read_file", "search_code", "write_file", "edit_file", "run_command"],
+    "hitl": { "mode": "dynamic", "default_action": "ask" }
+  },
+  "_team": { "mode": "parallel", "max_rounds": 10 }
+}
+```
+
+### 内置专家
+
+即使一个专家包都没有，系统也有内置的 `code-assistant`（通用代码助手），
+主编排器的 `direct` 路由会用到它。
+
+---
+
+## Web 服务
+
+| 接口 | 说明 |
+|------|------|
+| `GET /` | 单页界面（零构建、零前端依赖） |
+| `GET /api/catalog` | 专家 / 专家团目录 |
+| `POST /api/chat` | SSE 流式执行，按专家维度实时吐进度 |
+| `POST /api/approvals` | 对挂起的高危操作给出通过 / 拒绝 |
+| `POST /api/reload` | 热重载专家包 |
+
+SSE 事件统一为 `{type, expert, team, node, payload, ts}`，
+`expert` 字段就是前端按专家维度展示进度的依据。
+
+---
+
+## 项目结构
+
+```
+codeassistant/
+├── settings.py        # 全局配置（env / .env）
+├── contracts.py       # ★ 统一契约层 + 显式映射适配器
+├── configs.py         # ★ 声明式 ExpertConfig / TeamConfig / ToolSpec / HitlPolicy
+├── loader.py          # 专家包解析（plugin.json + agent md frontmatter）
+├── registry.py        # 专家注册表、工具绑定策略、热重载
+├── llm.py             # LLM 抽象：OpenAI 兼容 / Anthropic / 离线 Mock
+├── memory.py          # ★ 三层 thread_id 命名空间 + 混合 SQLite 检查点
+├── approval.py        # ★ 人审中心
+├── observability.py   # 统一流式事件
+├── app.py             # 应用门面（CLI / Web 共用）
+├── cli.py / server.py # 命令行 / Web 入口
+├── tools/             # 沙箱、代码工具、Git 工具、注册表
+└── graphs/
+    ├── expert.py          # ★ 专家子图（独立 State Schema）
+    ├── factory.py         # ★ 图工厂：(name, config_hash) 编译缓存 + 热更新
+    ├── supervisor_team.py # ★ Supervisor 专家团
+    ├── parallel_team.py   # ★ Map-Reduce 并行专家团
+    └── orchestrator.py    # ★ 主编排器
+```
+
+---
+
+## 测试
+
+```bash
+pytest -q
+```
+
+测试用假 LLM（`MockChat` 脚本模式）替换真实模型节点，用临时目录当沙箱，
+**不触网、不需要 API Key**。覆盖：专家包加载、工具绑定、编译缓存与热更新、
+专家子图契约、HITL 通过 / 拒绝与断点恢复、两种团队模式、记忆隔离、沙箱越界、主编排器路由。
+
+---
+
+## 扩展：加一个自己的专家
+
+```bash
+mkdir -p .codeassistant/my-experts/plugins/my-team/.codebuddy-plugin .codeassistant/my-experts/plugins/my-team/agents
+```
+
+`plugin.json`：
+
+```json
+{
+  "name": "my-team",
+  "expertType": "team",
+  "agentName": "my-team-lead",
+  "teamInfo": { "leadAgent": "my-team-lead", "memberAgents": ["my-worker"] },
+  "displayName": { "zh": "我的专家团" },
+  "description": "示例专家团"
+}
+```
+
+`agents/my-worker.md`：
+
+```markdown
+---
+name: my-worker
+description: 一位后端工程师。
+displayName:
+  zh: "小工"
+profession:
+  zh: "后端工程师"
+maxTurns: 50
+---
+
+你是一位后端工程师……
+```
+
+重新加载即可生效（`codeassistant reload`，或 Web 端右上角按钮）。

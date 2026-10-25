@@ -1,0 +1,21 @@
+{
+  "name": "my-experts",
+  "description": "my-experts marketplace (auto-generated)",
+  "plugins": [
+    {
+      "name": "software-development-team",
+      "source": "./plugins/software-development-team",
+      "description": "End-to-end software delivery team — requirements, architecture, frontend, backend, QA, and DevOps, orchestrated by a delivery director for quality and pace."
+    },
+    {
+      "name": "macro-economic-analyst",
+      "source": "./plugins/macro-economic-analyst",
+      "description": "Hardcore macroeconomic analyst for finance creators, covering GDP/CPI/PMI/social financing and central bank policy decoding with Toutiao-ready sharp commentary."
+    },
+    {
+      "name": "toutiao-finance-account-ops-team",
+      "source": "./plugins/toutiao-finance-account-ops-team",
+      "description": "Toutiao finance account operations team: data hunter, hard-core writer, and strict reviewer collaborate to produce data-dense, sharp-style hard-core finance articles for the 风中劲草哈 channel."
+    }
+  ]
+}

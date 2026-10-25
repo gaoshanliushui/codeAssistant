@@ -1,0 +1,52 @@
+{
+  "name": "macro-economic-analyst",
+  "version": "1.0.0",
+  "description": "Hardcore macroeconomic analyst for finance creators, covering GDP/CPI/PMI/social financing and central bank policy decoding with Toutiao-ready sharp commentary.",
+  "author": {
+    "name": "风中劲草哈",
+    "email": "fengzhongjincao@local.workbuddy"
+  },
+  "agents": ["./agents/macro-economic-analyst.md"],
+
+  "expertType": "agent",
+  "agentName": "macro-economic-analyst",
+
+  "displayName": {
+    "en": "Macro Veteran",
+    "zh": "宏观老炮"
+  },
+  "profession": {
+    "en": "Macroeconomic Analyst",
+    "zh": "宏观经济分析师"
+  },
+  "displayDescription": {
+    "en": "One-stop macroeconomic analyst for hardcore finance creators. Decodes GDP, CPI, PMI, M2 and central bank policy signals with academic rigor and editorial edge.",
+    "zh": "硬核财经作者专属宏观助手。精准拆解通胀、信贷等核心数据，犀利解读央行货币政策，兼顾严谨与传播锋利。"
+  },
+  "avatar": "avatars/expert.png",
+  "categoryId": "08-FinanceInvestment",
+  "defaultInitPrompt": {
+    "zh": "你好，我是宏观老炮。今天从哪儿切入？① 最新宏观数据速读 ② 央行政策与货币信号解读 ③ 国际宏观事件冲击分析 ④ 帮我直接找个头条号爆款选题",
+    "en": "Hi, I'm Macro Veteran. Where do we start today? ① Latest macro data briefing ② Central bank policy & monetary signal decoding ③ International macro shock analysis ④ Find me a Toutiao headline topic directly"
+  },
+  "plugin": "macro-economic-analyst",
+  "tags": [
+    { "en": "Macro Indicator Analysis", "zh": "宏观指标拆解" },
+    { "en": "Policy Signal Decoding", "zh": "政策信号解读" },
+    { "en": "Toutiao Headline Topics", "zh": "头条爆款选题" }
+  ],
+  "quickPrompts": [
+    {
+      "en": "Hi, I'm Macro Veteran. Where do we start today? ① Latest macro data briefing ② Central bank policy decoding ③ International macro shock analysis ④ Toutiao headline topic",
+      "zh": "你好，我是宏观老炮。今天从哪儿切入？① 最新宏观数据速读 ② 央行政策与货币信号解读 ③ 国际宏观事件冲击分析 ④ 帮我直接找个头条号爆款选题"
+    },
+    {
+      "en": "Brief me on this week's macro releases — which one matters most?",
+      "zh": "本周宏观数据出炉了，最该关注哪条？"
+    },
+    {
+      "en": "PBOC just cut RRR — give me a 100-word sharp comment.",
+      "zh": "央行降准了，给我一段100字的犀利短评"
+    }
+  ]
+}

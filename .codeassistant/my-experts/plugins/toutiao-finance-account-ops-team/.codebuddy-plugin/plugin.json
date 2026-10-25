@@ -1,0 +1,126 @@
+{
+  "name": "toutiao-finance-account-ops-team",
+  "version": "1.0.0",
+  "description": "Toutiao finance account operations team: data hunter, hard-core writer, and strict reviewer collaborate to produce data-dense, sharp-style hard-core finance articles for the 风中劲草哈 channel.",
+  "author": {
+    "name": "风中劲草哈",
+    "email": "[email protected]"
+  },
+  "agents": [
+    "./agents/toutiao-finance-account-ops-team-team-lead.md",
+    "./agents/finance-data-collector.md",
+    "./agents/finance-article-writer.md",
+    "./agents/article-reviewer.md"
+  ],
+  "expertType": "team",
+  "agentName": "toutiao-finance-account-ops-team-team-lead",
+  "teamInfo": {
+    "leadAgent": "toutiao-finance-account-ops-team-team-lead",
+    "memberAgents": [
+      "finance-data-collector",
+      "finance-article-writer",
+      "article-reviewer"
+    ]
+  },
+  "displayName": {
+    "en": "Toutiao Finance Account Ops Team",
+    "zh": "头条财经账户运营专家团"
+  },
+  "profession": {
+    "en": "Toutiao Finance Account Ops Team",
+    "zh": "头条财经账户运营专家团"
+  },
+  "displayDescription": {
+    "en": "End-to-end ops team for a hard-core finance Toutiao channel: data hunter, hard-core writer, and strict reviewer collaborate to deliver data-dense, sharp-style articles.",
+    "zh": "硬核财经头条号专属团队：数据采集、撰稿、严格审稿协同，输出数据密集、犀利、逻辑闭环的爆款。"
+  },
+  "avatar": "avatars/team.png",
+  "categoryId": "06-ContentCreative",
+  "defaultInitPrompt": {
+    "zh": "给我一个选题，我调度数据、撰稿、审稿三岗协同，把这篇稿子从立项到可发布完整跑通。",
+    "en": "Give me a topic and I'll orchestrate data, writing, and review to ship a hard-core finance Toutiao article end-to-end."
+  },
+  "plugin": "toutiao-finance-account-ops-team",
+  "tags": [
+    {
+      "en": "Hard-core Finance Writing",
+      "zh": "硬核财经撰稿"
+    },
+    {
+      "en": "Finance Data Analysis",
+      "zh": "财经数据分析"
+    },
+    {
+      "en": "Toutiao Content Ops",
+      "zh": "头条内容运营"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "en": "Give me a topic and I'll orchestrate data, writing, and review to ship a hard-core finance Toutiao article end-to-end.",
+      "zh": "给我一个选题，我调度数据、撰稿、审稿三岗协同，把这篇稿子从立项到可发布完整跑通。"
+    },
+    {
+      "en": "Just hunt me the latest macro / industry / company data with a chart and source list.",
+      "zh": "先帮我把最新宏观/行业/公司数据拉出来，附图、附来源、一句话解读。"
+    },
+    {
+      "en": "Run a strict review on this draft: fact-check, data-verify, compliance-check, style-calibrate.",
+      "zh": "帮我严格审这篇稿：事实核查、数据校核、合规审核、风格校准，四道关全跑。"
+    }
+  ],
+  "members": [
+    {
+      "id": "toutiao-finance-account-ops-team-team-lead",
+      "displayName": {
+        "en": "Editor-in-Chief Chen",
+        "zh": "陈统筹"
+      },
+      "profession": {
+        "en": "Investment Research Editor-in-Chief",
+        "zh": "投研内容主编"
+      },
+      "role": "lead",
+      "avatar": "avatars/toutiao-finance-account-ops-team-team-lead.png"
+    },
+    {
+      "id": "finance-data-collector",
+      "displayName": {
+        "en": "Lin Shulie",
+        "zh": "林数猎"
+      },
+      "profession": {
+        "en": "Finance Data Collector",
+        "zh": "财经数据采集师"
+      },
+      "role": "member",
+      "avatar": "avatars/finance-data-collector.png"
+    },
+    {
+      "id": "finance-article-writer",
+      "displayName": {
+        "en": "Qi Yinggao",
+        "zh": "齐硬稿"
+      },
+      "profession": {
+        "en": "Hard-core Finance Writer",
+        "zh": "财经撰稿人"
+      },
+      "role": "member",
+      "avatar": "avatars/finance-article-writer.png"
+    },
+    {
+      "id": "article-reviewer",
+      "displayName": {
+        "en": "Yan Baguan",
+        "zh": "严把关"
+      },
+      "profession": {
+        "en": "Content Review Director",
+        "zh": "内容审核总监"
+      },
+      "role": "member",
+      "avatar": "avatars/article-reviewer.png"
+    }
+  ]
+}
