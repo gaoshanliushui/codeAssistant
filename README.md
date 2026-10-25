@@ -57,6 +57,7 @@ export CODEASSISTANT_API_KEY=sk-xxx
 | `codeassistant chat` | 交互式会话，高危操作在终端里逐条审批 |
 | `codeassistant run "任务"` | 执行一次任务，`--expert` / `--team` 可跳过路由，`--json` 输出结构化结果 |
 | `codeassistant experts` | 列出所有专家与专家团（含工具白名单与人审点） |
+| `codeassistant skills` | 列出技能及其绑定到哪些专家 |
 | `codeassistant reload` | 热重载专家包，变更的专家图自动失效重建 |
 | `codeassistant serve` | 启动 FastAPI + SSE Web 服务 |
 
@@ -247,12 +248,71 @@ CLI 在终端里逐条询问；Web 端弹出审批卡片，POST `/api/approvals`
 
 ---
 
+## 技能（Skill）
+
+技能是「可按需载入的能力单元」，采用**渐进式披露**：系统提示里只放技能清单
+（名称 + 一句话描述），模型判断需要时再调用 `load_skill` 载入完整说明——
+这样技能再多也不会撑爆上下文。
+
+```
+.codeassistant/skills/<技能名>/
+├── SKILL.md            # 必需：frontmatter + 给模型看的正文
+├── scripts/*.py        # 可选：随技能附带的脚本
+└── references/*        # 可选：补充资料
+```
+
+技能文件带 YAML frontmatter：
+
+```markdown
+---
+name: code-review
+description: 对指定代码做结构化评审，输出按严重级别排序的问题清单
+agents: [code-assistant, sdt-backend]   # 可选：绑定到哪些专家
+default: false                           # 可选：true = 绑定给所有专家
+---
+
+# 代码评审
+…给模型看的使用说明…
+```
+
+### 绑定规则（按优先级）
+
+1. 专家包 `agent-tools.json` 里显式列出的技能 —— 一定绑定；
+2. frontmatter 声明了 `agents` 的技能 —— 只绑给列出的专家；
+3. frontmatter 声明了 `default: true` 的技能 —— 绑给所有专家；
+4. 都没声明的技能 —— 绑给通用型专家（内置 `code-assistant`）。
+
+没绑定的技能模型看不到也载不到，避免在无关技能之间游走。
+
+### 三个技能工具
+
+| 工具 | 风险 | 作用 |
+|------|------|------|
+| `list_skills` | low | 列出可用技能 |
+| `load_skill` | low | 载入技能完整说明 |
+| `run_skill_script` | high | 执行技能自带脚本，**需人工审批** |
+
+`run_skill_script` 的脚本只能来自该技能自己的 `scripts/` 目录（路径二次校验），
+执行环境剔除敏感环境变量，与 `run_command` 一样受沙箱与审批约束。
+
+### 现成的示例技能
+
+`.codeassistant/skills/` 下已经放好三个：
+
+- `code-review` —— 结构化代码评审（绑定 sdt-backend / sdt-frontend / sdt-qa）
+- `commit-message` —— 按 Conventional Commits 生成提交信息
+- `code-stats` —— 统计各语言代码行数（自带 `scripts/stats.py`）
+
+包内技能放在 `<专家包>/skills/`，同样支持 `agents` 绑定。
+
+---
+
 ## Web 服务
 
 | 接口 | 说明 |
 |------|------|
 | `GET /` | 单页界面（零构建、零前端依赖） |
-| `GET /api/catalog` | 专家 / 专家团目录 |
+| `GET /api/catalog` | 专家 / 专家团 / 技能目录 |
 | `POST /api/chat` | SSE 流式执行，按专家维度实时吐进度 |
 | `POST /api/approvals` | 对挂起的高危操作给出通过 / 拒绝 |
 | `POST /api/reload` | 热重载专家包 |
@@ -270,14 +330,15 @@ codeassistant/
 ├── contracts.py       # ★ 统一契约层 + 显式映射适配器
 ├── configs.py         # ★ 声明式 ExpertConfig / TeamConfig / ToolSpec / HitlPolicy
 ├── loader.py          # 专家包解析（plugin.json + agent md frontmatter）
-├── registry.py        # 专家注册表、工具绑定策略、热重载
+├── skills.py          # ★ 技能模型与注册表（渐进式披露）
+├── registry.py        # 专家注册表、工具/技能绑定策略、热重载
 ├── llm.py             # LLM 抽象：OpenAI 兼容 / Anthropic / 离线 Mock
 ├── memory.py          # ★ 三层 thread_id 命名空间 + 混合 SQLite 检查点
 ├── approval.py        # ★ 人审中心
 ├── observability.py   # 统一流式事件
 ├── app.py             # 应用门面（CLI / Web 共用）
 ├── cli.py / server.py # 命令行 / Web 入口
-├── tools/             # 沙箱、代码工具、Git 工具、注册表
+├── tools/             # 沙箱、代码工具、Git 工具、技能工具、注册表
 └── graphs/
     ├── expert.py          # ★ 专家子图（独立 State Schema）
     ├── factory.py         # ★ 图工厂：(name, config_hash) 编译缓存 + 热更新
@@ -295,8 +356,9 @@ pytest -q
 ```
 
 测试用假 LLM（`MockChat` 脚本模式）替换真实模型节点，用临时目录当沙箱，
-**不触网、不需要 API Key**。覆盖：专家包加载、工具绑定、编译缓存与热更新、
-专家子图契约、HITL 通过 / 拒绝与断点恢复、两种团队模式、记忆隔离、沙箱越界、主编排器路由。
+**不触网、不需要 API Key**。覆盖：专家包加载、工具与技能绑定、编译缓存与热更新、
+专家子图契约、HITL 通过 / 拒绝与断点恢复、两种团队模式、记忆隔离、沙箱越界、
+技能发现/载入/脚本审批、主编排器路由。
 
 ---
 
@@ -336,3 +398,34 @@ maxTurns: 50
 ```
 
 重新加载即可生效（`codeassistant reload`，或 Web 端右上角按钮）。
+
+---
+
+## 扩展：加一个自己的技能
+
+```bash
+mkdir -p .codeassistant/skills/my-skill/scripts
+```
+
+`.codeassistant/skills/my-skill/SKILL.md`：
+
+```markdown
+---
+name: my-skill
+description: 一句话说清这个技能能干什么（会出现在技能清单里）
+agents: [code-assistant, my-worker]   # 不写就只归通用型专家
+---
+
+# 我的技能
+
+1. 第一步……
+2. 第二步……
+
+需要跑脚本时：
+run_skill_script(skill_name="my-skill", script="helper.py", arguments="--flag")
+```
+
+脚本放在 `scripts/` 下，只能用 `run_skill_script` 调用（会自动过人工审批），
+路径不能越出技能自己的目录。
+
+`codeassistant skills` 可以查看技能及其绑定情况。

@@ -24,6 +24,7 @@ from .builtin import (
 from .configs import ExpertConfig, HitlPolicy, TeamConfig, ToolSpec
 from .loader import LoadedPack, load_packs
 from .settings import Settings
+from .skills import Skill, SkillRegistry
 from .tools.registry import DEFAULT_TOOLS, TOOL_SPECS, ToolRegistry
 
 #: 职位关键词 → 工具白名单（按顺序匹配，先命中先用）
@@ -128,11 +129,17 @@ class ExpertRegistry:
         settings: Settings,
         tools: ToolRegistry | None = None,
         packs: Iterable[LoadedPack] | None = None,
+        skills: SkillRegistry | None = None,
     ) -> None:
         self.settings = settings
         self.tools = tools
 
         self.packs: list[LoadedPack] = list(packs) if packs is not None else load_packs(settings.experts_dir)
+        self.skills = (
+            skills
+            if skills is not None
+            else SkillRegistry.load(global_dir=settings.skills_dir, packs=self.packs)
+        )
         self.experts: dict[str, ExpertConfig] = {}
         self.teams: dict[str, TeamConfig] = {}
         self._build()
@@ -166,7 +173,8 @@ class ExpertRegistry:
             description=CODE_ASSISTANT_DESCRIPTION,
             system_prompt=CODE_ASSISTANT_PROMPT,
             tools=CODE_ASSISTANT_TOOLS,
-            skills=("代码检索", "代码修改", "问题定位"),
+            skills=tuple(skill.name for skill in self.skills.bind("code-assistant")),
+            tags=("代码检索", "代码修改", "问题定位"),
             memory_scope="session",
             hitl=HitlPolicy(tools=hitl, mode=self.settings.approval_mode),
             max_turns=MAX_AGENT_ITERATIONS,
@@ -188,12 +196,16 @@ class ExpertRegistry:
         default_action = hitl_override.get("default_action", "ask")
 
         tags = pack.plugin.get("tags") or []
-        skills = tuple(
+        tag_list = tuple(
             str(tag.get("zh") or tag.get("en") or tag) if isinstance(tag, dict) else str(tag)
             for tag in tags
         )
         if doc.profession:
-            skills = tuple(dict.fromkeys((*skills, doc.title())))
+            tag_list = tuple(dict.fromkeys((*tag_list, doc.title())))
+
+        # 绑定技能：包内 agent-tools.json 显式声明的 + frontmatter 声明绑定到本专家的
+        explicit_skills = [str(name) for name in (override.get("skills") or [])]
+        bound = self.skills.bind(doc.name, explicit=explicit_skills)
 
         return ExpertConfig(
             name=doc.name,
@@ -202,7 +214,8 @@ class ExpertRegistry:
             description=doc.description,
             system_prompt=doc.system_prompt,
             tools=tools,
-            skills=skills,
+            skills=tuple(skill.name for skill in bound),
+            tags=tag_list,
             memory_scope="expert",
             hitl=HitlPolicy(
                 tools=hitl_tools,
@@ -284,6 +297,12 @@ class ExpertRegistry:
 
     def tool_specs_for(self, config: ExpertConfig) -> list[ToolSpec]:
         return [TOOL_SPECS[name] for name in config.tools if name in TOOL_SPECS]
+
+    def skills_for(self, config: ExpertConfig) -> list[Skill]:
+        """某个专家实际绑定的技能对象。"""
+
+        bound = self.skills.bind(config.name, explicit=config.skills)
+        return bound
 
     # -- 热重载 -----------------------------------------------------------
 

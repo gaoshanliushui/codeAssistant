@@ -81,6 +81,25 @@ TOOL_SPECS: dict[str, ToolSpec] = {
             risk="low",
             tags=("read", "git"),
         ),
+        ToolSpec(
+            name="list_skills",
+            description="列出当前可用的技能（名称与一句话说明）。",
+            risk="low",
+            tags=("skill",),
+        ),
+        ToolSpec(
+            name="load_skill",
+            description="载入指定技能的完整说明文档，然后按说明执行。",
+            risk="low",
+            tags=("skill",),
+        ),
+        ToolSpec(
+            name="run_skill_script",
+            description="执行技能自带的脚本（scripts/ 目录下）。",
+            risk="high",
+            requires_approval=True,
+            tags=("skill", "exec"),
+        ),
     ]
 }
 

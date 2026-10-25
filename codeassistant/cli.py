@@ -241,6 +241,35 @@ async def _chat(app: CodeAssistant, session_id: str) -> int:
     return 0
 
 
+def _print_skills(app: CodeAssistant) -> None:
+    """列出技能及其绑定情况。"""
+
+    registry = app.registry
+    skills = registry.skills.list()
+    if not skills:
+        print(_c("还没有任何技能。", YELLOW))
+        print(_c(f"  放到 {app.settings.skills_dir}/<技能名>/SKILL.md 即可", DIM))
+        return
+
+    bound_by: dict[str, list[str]] = {}
+    for config in registry.list_experts():
+        for name in config.skills:
+            bound_by.setdefault(name, []).append(config.name)
+
+    print(_c(f"技能（{len(skills)} 个）：", BOLD))
+    for skill in skills:
+        scope = ", ".join(skill.agents) if skill.agents else (
+            "所有专家" if skill.default else "通用型专家（code-assistant）"
+        )
+        print(f"  {_c(skill.name, CYAN)}  {skill.description}")
+        print(f"    来源：{skill.source}　绑定：{scope}")
+        if skill.scripts:
+            print(f"    脚本：{', '.join(skill.scripts)}")
+        holders = bound_by.get(skill.name) or []
+        if holders:
+            print(f"    实际绑定：{', '.join(holders)}")
+
+
 def _print_catalog(app: CodeAssistant) -> None:
     catalog = app.list_catalog()
     print(_c("专家团：", BOLD))
@@ -291,6 +320,7 @@ def build_parser() -> argparse.ArgumentParser:
     chat_cmd.add_argument("--session", help="会话 ID（默认随机）")
 
     sub.add_parser("experts", help="列出专家与专家团")
+    sub.add_parser("skills", help="列出技能及其绑定")
     sub.add_parser("reload", help="热重载专家包")
 
     serve_cmd = sub.add_parser("serve", help="启动 Web 服务")
@@ -323,6 +353,10 @@ def main(argv: list[str] | None = None) -> int:
         try:
             if command == "experts":
                 _print_catalog(app)
+                return 0
+
+            if command == "skills":
+                _print_skills(app)
                 return 0
 
             if command == "reload":

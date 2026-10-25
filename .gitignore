@@ -10,6 +10,7 @@ build/
 *.egg-info/
 .DS_Store
 
-# 应用数据目录：只忽略运行时状态，专家包是要纳入版本管理的
+# 应用数据目录：只忽略运行时状态，专家包与技能是要纳入版本管理的
 .codeassistant/*
 !.codeassistant/my-experts/
+!.codeassistant/skills/

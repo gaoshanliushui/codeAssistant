@@ -83,7 +83,10 @@ class ExpertConfig:
     description: str = ""
     system_prompt: str = ""
     tools: tuple[str, ...] = ()
+    #: 绑定的技能名（对应 :mod:`codeassistant.skills` 里的 Skill）
     skills: tuple[str, ...] = ()
+    #: 描述性标签（来自专家包的 tags / 职位），仅用于展示
+    tags: tuple[str, ...] = ()
     memory_scope: MemoryScope = "expert"
     hitl: HitlPolicy = field(default_factory=HitlPolicy)
     max_turns: int = 12
@@ -107,6 +110,7 @@ class ExpertConfig:
             "system_prompt": self.system_prompt,
             "tools": sorted(self.tools),
             "skills": sorted(self.skills),
+            "tags": sorted(self.tags),
             "memory_scope": self.memory_scope,
             "hitl": self.hitl.to_dict(),
             "max_turns": self.max_turns,

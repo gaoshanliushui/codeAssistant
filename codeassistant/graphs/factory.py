@@ -102,6 +102,7 @@ class ExpertGraphFactory:
             tool_registry=self.tool_registry,
             approval_center=self.approval_center,
             checkpointer=NamespacedSaver(self._base_checkpointer, namespace),
+            skills=self.registry.skills_for(config),
         )
         self._cache[key] = graph
         self.stats.size = len(self._cache)

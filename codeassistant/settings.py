@@ -25,6 +25,8 @@ PROJECT_ROOT = PACKAGE_ROOT.parent
 APP_DIR = PROJECT_ROOT / ".codeassistant"
 #: 专家包目录（``<APP_DIR>/my-experts``）
 EXPERTS_DIR = APP_DIR / "my-experts"
+#: 全局技能目录（``<APP_DIR>/skills``）
+SKILLS_DIR = APP_DIR / "skills"
 
 DEFAULT_MODELS: dict[str, str] = {
     "openai": "gpt-4o-mini",
@@ -54,6 +56,8 @@ class Settings:
     workspace: Path = field(default_factory=lambda: PROJECT_ROOT)
     #: 专家包目录
     experts_dir: Path = field(default_factory=lambda: EXPERTS_DIR)
+    #: 全局技能目录
+    skills_dir: Path = field(default_factory=lambda: SKILLS_DIR)
 
     #: 状态持久化
     checkpointer: CheckpointerKind = "sqlite"
@@ -75,6 +79,7 @@ class Settings:
         *,
         workspace: Path | str | None = None,
         experts_dir: Path | str | None = None,
+        skills_dir: Path | str | None = None,
         provider: str | None = None,
         **overrides: object,
     ) -> Settings:
@@ -99,6 +104,9 @@ class Settings:
             workspace=Path(workspace or _env("CODEASSISTANT_WORKSPACE", str(PROJECT_ROOT))).expanduser(),
             experts_dir=Path(
                 experts_dir or _env("CODEASSISTANT_EXPERTS_DIR", str(EXPERTS_DIR))
+            ).expanduser(),
+            skills_dir=Path(
+                skills_dir or _env("CODEASSISTANT_SKILLS_DIR", str(SKILLS_DIR))
             ).expanduser(),
             checkpointer=(_env("CODEASSISTANT_CHECKPOINTER", "sqlite") or "sqlite"),  # type: ignore[arg-type]
             state_db=Path(

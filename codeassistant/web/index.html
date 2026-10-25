@@ -55,6 +55,7 @@
     background: rgba(91,140,255,.16); color: #9db8ff; border: 1px solid rgba(91,140,255,.3);
   }
   .badge.team { background: rgba(124,92,255,.16); color: #b8a5ff; border-color: rgba(124,92,255,.32); }
+  .badge.skill { background: rgba(62,207,142,.14); color: #7fe0b4; border-color: rgba(62,207,142,.3); }
 
   /* ---------- 主区 ---------- */
   main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -345,9 +346,26 @@ async function loadCatalog() {
   box.appendChild(expH);
   (cat.experts || []).forEach(e => {
     const it = el("div", "item");
-    it.innerHTML = `<div class="name">${esc(e.display_name || e.name)}</div>
+    const skills = (e.skills || []).length
+      ? ` <span class="badge skill">${e.skills.length} 技能</span>` : "";
+    it.innerHTML = `<div class="name">${esc(e.display_name || e.name)}${skills}</div>
       <div class="meta">${esc(e.name)} · ${esc(e.profession || "")}</div>`;
     it.onclick = () => { selectExpert(e.name); document.querySelectorAll(".item").forEach(n => n.classList.remove("active")); it.classList.add("active"); };
+    box.appendChild(it);
+  });
+
+  const skillH = el("h2", null, "技能");
+  box.appendChild(skillH);
+  if (!(cat.skills || []).length) {
+    box.appendChild(el("div", "item", '<div class="meta">暂无技能</div>'));
+  }
+  (cat.skills || []).forEach(s => {
+    const it = el("div", "item");
+    const scope = (s.agents || []).length ? s.agents.join(", ")
+      : (s.default ? "所有专家" : "通用型专家");
+    it.innerHTML = `<div class="name">${esc(s.name)}</div>
+      <div class="meta">${esc(s.description || "")}</div>
+      <div class="meta">绑定：${esc(scope)}</div>`;
     box.appendChild(it);
   });
 }

@@ -102,7 +102,7 @@ class CodeAssistant:
     # -- 目录 -------------------------------------------------------------
 
     def list_catalog(self) -> dict[str, Any]:
-        """专家 / 专家团目录。"""
+        """专家 / 专家团 / 技能目录。"""
 
         return {
             "experts": [
@@ -112,6 +112,7 @@ class CodeAssistant:
                     "profession": config.profession,
                     "description": config.description,
                     "tools": list(config.tools),
+                    "skills": list(config.skills),
                     "hitl": list(config.hitl.tools),
                     "source": config.source,
                 }
@@ -127,6 +128,17 @@ class CodeAssistant:
                     "mode": team.mode,
                 }
                 for team in self.registry.list_teams()
+            ],
+            "skills": [
+                {
+                    "name": skill.name,
+                    "description": skill.description,
+                    "source": skill.source,
+                    "agents": list(skill.agents),
+                    "default": skill.default,
+                    "scripts": list(skill.scripts),
+                }
+                for skill in self.registry.skills.list()
             ],
         }
 

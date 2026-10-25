@@ -38,10 +38,12 @@ from langgraph.graph.message import add_messages
 from langgraph.types import interrupt
 
 from ..approval import ApprovalCenter, ApprovalRequest, parse_resume_value
-from ..configs import ExpertConfig
+from ..configs import ExpertConfig, HitlPolicy
 from ..contracts import Artifact, ExpertOutput
 from ..observability import EventType, get_writer
+from ..skills import Skill, SkillRegistry
 from ..tools.registry import TOOL_SPECS, ToolRegistry
+from ..tools.skill_tools import build_skill_tools
 
 #: 工具执行失败时的兜底提示
 TOOL_ERROR_PREFIX = "工具执行失败："
@@ -165,6 +167,28 @@ def _fallback_message(exc: Exception, prefix: str = "") -> AIMessage:
     return AIMessage(content=f"{prefix}模型调用失败（{type(exc).__name__}: {exc}）。")
 
 
+def _approval_required_tools(
+    policy: HitlPolicy,
+    selected_tools: list[BaseTool],
+    declared_tools: tuple[str, ...],
+) -> set[str]:
+    """算出这个专家实际需要人工审批的工具集合。
+
+    * 策略里显式列出的工具要审批；
+    * **动态注入**的高危工具（例如技能自带的脚本执行器）一律要审批——
+      它们不在专家声明的白名单里，风险等级是兜底安全网；
+    * 专家自己声明的白名单工具则完全听策略的，配置可以收窄也可以放宽。
+    """
+
+    required = set(policy.tools)
+    declared = set(declared_tools)
+    for tool in selected_tools:
+        spec = TOOL_SPECS.get(tool.name)
+        if spec and spec.requires_approval and tool.name not in declared:
+            required.add(tool.name)
+    return required
+
+
 def build_expert_graph(
     expert_config: ExpertConfig,
     *,
@@ -173,6 +197,7 @@ def build_expert_graph(
     approval_center: ApprovalCenter | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
     tools: list[BaseTool] | None = None,
+    skills: list[Skill] | None = None,
 ) -> Any:
     """构建并编译单个专家子图。
 
@@ -182,14 +207,30 @@ def build_expert_graph(
     :param approval_center: 人审中心
     :param checkpointer: 该专家自己的检查点保存器
     :param tools: 覆盖默认工具白名单（测试用）
+    :param skills: 该专家绑定的技能（提供技能工具 + 系统提示里的技能清单）
     """
 
     center = approval_center or ApprovalCenter()
     selected_tools = tools if tools is not None else tool_registry.for_expert(expert_config.tools)
+    bound_skills = list(skills or [])
+    if bound_skills:
+        selected_tools = [
+            *selected_tools,
+            *build_skill_tools(bound_skills, tool_registry.sandbox),
+        ]
     # 白名单在**执行期**同样生效：模型即使"幻觉"出白名单外的工具名也调不动
     allowed_tools = {tool.name: tool for tool in selected_tools}
+    approval_required = _approval_required_tools(
+        expert_config.hitl, selected_tools, expert_config.tools
+    )
     max_turns = max(1, expert_config.max_turns)
     expert_name = expert_config.name
+
+    # 系统提示 = 专家提示词 + 技能清单（渐进式披露：清单很便宜，正文按需载入）
+    system_prompt = expert_config.system_prompt
+    skill_index = SkillRegistry.render_index(bound_skills)
+    if skill_index:
+        system_prompt = f"{system_prompt}\n\n{skill_index}"
 
     # ------------------------------------------------------------------
     # 节点
@@ -205,7 +246,7 @@ def build_expert_graph(
         )
         try:
             reply = llm.invoke(
-                [SystemMessage(expert_config.system_prompt), HumanMessage(prompt)]
+                [SystemMessage(system_prompt), HumanMessage(prompt)]
             )
             plan_text = str(reply.content)
         except Exception as exc:  # pragma: no cover - 依赖外部服务
@@ -227,7 +268,7 @@ def build_expert_graph(
         history: list[AnyMessage] = list(state.get("messages") or [])
         # 历史在前、本轮指令在后：专家跨轮次保留记忆时，先看到上轮过程再看新指令
         messages: list[AnyMessage] = [
-            SystemMessage(expert_config.system_prompt),
+            SystemMessage(system_prompt),
             *history,
             HumanMessage(_build_task_prompt(state)),
         ]
@@ -293,31 +334,41 @@ def build_expert_graph(
         artifacts: list[dict[str, Any]] = list(state.get("artifacts") or [])
 
         # ---------------- 阶段 1：审批 ----------------
-        verdicts: list[tuple[dict[str, Any], bool, str]] = []
+        # 白名单外的工具直接判负——不该为反正会被拒绝的调用去打扰用户
+        reviewable = [call for call in pending if call["name"] in allowed_tools]
+        verdicts: list[tuple[dict[str, Any], bool, str]] = [
+            (call, False, "not-allowed") for call in pending if call["name"] not in allowed_tools
+        ]
 
         if policy.mode == "static":
-            needs_batch_review = any(policy.needs_approval(call["name"]) for call in pending)
+            needs_batch_review = any(
+                call["name"] in approval_required for call in reviewable
+            )
             if needs_batch_review:
-                pre_registered = lookup_decision(center, thread_id, expert_name, pending[0], pending)
+                pre_registered = lookup_decision(
+                    center, thread_id, expert_name, reviewable[0], reviewable
+                )
                 if pre_registered is not None:
                     # 前端已统一放行，不再重复打断
                     approved = pre_registered.state == "approved"
                     note = pre_registered.decision_note
-                    verdicts = [(call, approved, note) for call in pending]
+                    verdicts.extend((call, approved, note) for call in reviewable)
                 else:
                     batch_request = center.create(
                         expert=expert_name,
-                        tool=",".join(sorted({str(call["name"]) for call in pending})),
-                        args={"calls": pending},
-                        reason=f"{expert_name} 请求批量执行 {len(pending)} 个高危工具",
+                        tool=",".join(sorted({str(call["name"]) for call in reviewable})),
+                        args={"calls": reviewable},
+                        reason=f"{expert_name} 请求批量执行 {len(reviewable)} 个高危工具",
                         risk="high",
                         thread_id=thread_id,
-                        request_id=static_batch_request_id(thread_id, expert_name, pending),
+                        request_id=static_batch_request_id(
+                            thread_id, expert_name, reviewable
+                        ),
                     )
                     batch_payload = {
                         **batch_request.to_payload(),
                         "kind": "batch_approval",
-                        "calls": pending,
+                        "calls": reviewable,
                     }
                     if writer is not None:
                         writer(
@@ -329,11 +380,11 @@ def build_expert_graph(
                         )
                     decision = interrupt(batch_payload)
                     approved, note = parse_resume_value(decision)
-                    verdicts = [(call, approved, note) for call in pending]
+                    verdicts.extend((call, approved, note) for call in reviewable)
         else:
-            for call in pending:
+            for call in reviewable:
                 name = call["name"]
-                if not policy.needs_approval(name):
+                if name not in approval_required:
                     verdicts.append((call, True, ""))
                     continue
                 pre_registered = lookup_decision(center, thread_id, expert_name, call, pending)
@@ -371,7 +422,14 @@ def build_expert_graph(
             args = call["args"]
 
             if not approved:
-                message = f"{REJECTED_PREFIX}：{note or '未说明原因'}（工具：{name}）"
+                if note == "not-allowed":
+                    message = (
+                        f"工具 {name} 不在本专家的白名单内，已拒绝执行。"
+                        if name in TOOL_SPECS
+                        else f"未知工具 {name}"
+                    )
+                else:
+                    message = f"{REJECTED_PREFIX}：{note or '未说明原因'}（工具：{name}）"
                 findings.append(message)
                 messages.append(
                     ToolMessage(content=message, tool_call_id=call["id"], name=name)
@@ -448,7 +506,7 @@ def build_expert_graph(
         writer = get_writer()
         history = list(state.get("messages") or [])
         messages: list[AnyMessage] = [
-            SystemMessage(expert_config.system_prompt),
+            SystemMessage(system_prompt),
             HumanMessage(
                 "请基于以上过程给出最终结论：说明结论、依据、以及后续建议（如果需要他人配合请写进 next_action）。"
             ),
