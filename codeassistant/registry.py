@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -135,6 +136,14 @@ class ExpertRegistry:
         self.tools = tools
 
         self.packs: list[LoadedPack] = list(packs) if packs is not None else load_packs(settings.experts_dir)
+        if packs is None and not settings.experts_dir.is_dir():
+            # 目录不存在时只会剩下内置专家，这里明确提示，避免"专家凭空消失"
+            print(
+                f"⚠️  专家包目录不存在：{settings.experts_dir}\n"
+                f"    仅加载内置专家 code-assistant；"
+                f"检查 CODEASSISTANT_EXPERTS_DIR 或 .env 里的相对路径。",
+                file=sys.stderr,
+            )
         self.skills = (
             skills
             if skills is not None

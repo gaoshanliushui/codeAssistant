@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from codeassistant.configs import HitlPolicy
 from codeassistant.graphs.expert import build_expert_graph, expert_output_from_state
 from codeassistant.llm import MockChat
 from codeassistant.memory import NamespacedSaver
+from codeassistant.registry import ExpertRegistry
 from codeassistant.settings import Settings
 from codeassistant.tools import Sandbox, ToolRegistry
 
@@ -324,3 +326,117 @@ def test_workspace_env_is_respected(tmp_path: Path):
     settings = Settings.load(workspace=tmp_path, provider="mock", checkpointer="memory")
     assert settings.workspace == tmp_path.resolve()
     assert os.path.isdir(settings.workspace)
+
+
+# --------------------------------------------------------------------------
+# .env 里的相对路径必须以 .env 所在目录为基准
+# --------------------------------------------------------------------------
+
+_PATH_ENV_KEYS = (
+    "CODEASSISTANT_WORKSPACE",
+    "CODEASSISTANT_EXPERTS_DIR",
+    "CODEASSISTANT_SKILLS_DIR",
+    "CODEASSISTANT_STATE_DB",
+)
+
+
+def _write_env_with_relative_paths(project: Path) -> Path:
+    """在 ``project`` 下写一份「全是相对路径」的 .env，并造一个专家包。"""
+
+    experts_dir = project / ".codeassistant" / "my-experts"
+    pack_root = experts_dir / "plugins" / "demo-team" / ".codebuddy-plugin"
+    agents_dir = experts_dir / "plugins" / "demo-team" / "agents"
+    pack_root.mkdir(parents=True)
+    agents_dir.mkdir(parents=True)
+
+    (pack_root / "plugin.json").write_text(
+        json.dumps(
+            {
+                "name": "demo-team",
+                "expertType": "team",
+                "agentName": "demo-lead",
+                "teamInfo": {"leadAgent": "demo-lead", "memberAgents": ["demo-worker"]},
+                "displayName": {"zh": "演示团"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    for name in ("demo-lead", "demo-worker"):
+        (agents_dir / f"{name}.md").write_text(
+            f"---\nname: {name}\ndescription: d\ndisplayName:\n  zh: '{name}'\n"
+            f"profession:\n  zh: '职位'\nmaxTurns: 20\n---\n\n提示词\n",
+            encoding="utf-8",
+        )
+
+    env_file = project / ".env"
+    env_file.write_text(
+        "CODEASSISTANT_WORKSPACE=.\n"
+        "CODEASSISTANT_EXPERTS_DIR=./.codeassistant/my-experts\n"
+        "CODEASSISTANT_SKILLS_DIR=./.codeassistant/skills\n"
+        "CODEASSISTANT_STATE_DB=.codeassistant/state.db\n",
+        encoding="utf-8",
+    )
+    return env_file
+
+
+def test_env_relative_paths_resolve_against_env_dir(tmp_path: Path, monkeypatch):
+    """换目录启动也不该把专家包、状态库、工作区指到别处。
+
+    曾经的真实缺陷：``.env`` 里写的是相对路径，而解析时用的是**进程当前目录**，
+    于是从包目录（``python -m codeassistant.cli serve``）启动时，
+    专家包目录指向了不存在的路径，网页上「专家 / 专家团」全空。
+    """
+
+    project = tmp_path / "project"
+    project.mkdir()
+    env_file = _write_env_with_relative_paths(project)
+
+    for key in _PATH_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    settings = Settings.load(env_file=env_file, provider="mock", checkpointer="memory")
+
+    assert settings.workspace == project.resolve()
+    assert settings.experts_dir == (project / ".codeassistant" / "my-experts").resolve()
+    assert settings.skills_dir == (project / ".codeassistant" / "skills").resolve()
+    assert settings.state_db == (project / ".codeassistant" / "state.db").resolve()
+
+
+def test_experts_load_from_env_relative_dir(tmp_path: Path, monkeypatch):
+    """从别的目录启动，专家与专家团照样要加载出来。"""
+
+    project = tmp_path / "project"
+    project.mkdir()
+    env_file = _write_env_with_relative_paths(project)
+
+    for key in _PATH_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    settings = Settings.load(env_file=env_file, provider="mock", checkpointer="memory")
+    registry = ExpertRegistry(settings)
+
+    assert registry.get_expert("demo-worker") is not None
+    team = registry.get_team("demo-team")
+    assert team is not None
+    assert team.lead == "demo-lead"
+    assert list(team.members) == ["demo-worker"]
+
+
+def test_missing_experts_dir_warns_on_stderr(tmp_path: Path, capsys):
+    """专家包目录不存在时要有提示，而不是静默只剩内置专家。"""
+
+    settings = Settings.load(
+        workspace=tmp_path,
+        experts_dir=tmp_path / "不存在的目录",
+        provider="mock",
+        checkpointer="memory",
+    )
+    ExpertRegistry(settings)
+
+    assert "专家包目录不存在" in capsys.readouterr().err

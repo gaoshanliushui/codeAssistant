@@ -42,6 +42,20 @@ def _env(name: str, default: str | None = None) -> str | None:
     return value
 
 
+def _resolve_path(value: str | Path, base: Path) -> Path:
+    """把路径配置解析成绝对路径：相对路径以 ``base`` 为基准。
+
+    ``base`` 的选择很关键——``.env`` 里的相对路径必须以 ``.env`` 所在目录为基准，
+    否则换个目录启动（比如从包目录 ``python -m codeassistant.cli serve``），
+    专家包、状态库、工作区就会全部指向错误的位置。
+    """
+
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = base / path
+    return path.resolve()
+
+
 @dataclass
 class Settings:
     """运行时配置。"""
@@ -83,11 +97,30 @@ class Settings:
         provider: str | None = None,
         **overrides: object,
     ) -> Settings:
-        """从 ``.env`` + 环境变量 + 显式入参构建配置（显式入参优先级最高）。"""
+        """从 ``.env`` + 环境变量 + 显式入参构建配置（显式入参优先级最高）。
 
-        env_path = Path(env_file) if env_file else PROJECT_ROOT / ".env"
+        路径解析规则：
+
+        * 显式入参（``--workspace`` 等）里的相对路径以**当前工作目录**为基准；
+        * ``.env`` / 环境变量里的相对路径以 **``.env`` 所在目录**为基准。
+        """
+
+        env_path = Path(env_file).expanduser() if env_file else PROJECT_ROOT / ".env"
         if env_path.exists():
             load_dotenv(env_path, override=False)
+        # .env 里的相对路径以 .env 所在目录为基准，与启动目录无关
+        env_base = env_path.resolve().parent
+        cwd = Path.cwd()
+
+        def _path(
+            explicit: Path | str | None,
+            env_key: str,
+            default: Path,
+        ) -> Path:
+            if explicit:
+                return _resolve_path(explicit, cwd)
+            value = _env(env_key)
+            return _resolve_path(value if value else default, env_base)
 
         provider_value = (provider or _env("CODEASSISTANT_PROVIDER", "mock") or "mock").lower()
         if provider_value not in ("openai", "anthropic", "mock"):
@@ -101,17 +134,11 @@ class Settings:
             api_key=_env("CODEASSISTANT_API_KEY"),
             base_url=_env("CODEASSISTANT_BASE_URL"),
             temperature=float(_env("CODEASSISTANT_TEMPERATURE", "0.0") or 0.0),
-            workspace=Path(workspace or _env("CODEASSISTANT_WORKSPACE", str(PROJECT_ROOT))).expanduser(),
-            experts_dir=Path(
-                experts_dir or _env("CODEASSISTANT_EXPERTS_DIR", str(EXPERTS_DIR))
-            ).expanduser(),
-            skills_dir=Path(
-                skills_dir or _env("CODEASSISTANT_SKILLS_DIR", str(SKILLS_DIR))
-            ).expanduser(),
+            workspace=_path(workspace, "CODEASSISTANT_WORKSPACE", PROJECT_ROOT),
+            experts_dir=_path(experts_dir, "CODEASSISTANT_EXPERTS_DIR", EXPERTS_DIR),
+            skills_dir=_path(skills_dir, "CODEASSISTANT_SKILLS_DIR", SKILLS_DIR),
             checkpointer=(_env("CODEASSISTANT_CHECKPOINTER", "sqlite") or "sqlite"),  # type: ignore[arg-type]
-            state_db=Path(
-                _env("CODEASSISTANT_STATE_DB", str(PROJECT_ROOT / ".codeassistant" / "state.db"))
-            ).expanduser(),
+            state_db=_path(None, "CODEASSISTANT_STATE_DB", APP_DIR / "state.db"),
             approval_mode=(_env("CODEASSISTANT_APPROVAL_MODE", "dynamic") or "dynamic"),  # type: ignore[arg-type]
             max_team_rounds=int(_env("CODEASSISTANT_MAX_TEAM_ROUNDS", "8") or 8),
             default_team_mode=(
@@ -121,6 +148,7 @@ class Settings:
         )
         base.workspace = base.workspace.resolve()
         base.experts_dir = base.experts_dir.resolve()
+        base.skills_dir = base.skills_dir.resolve()
         base.state_db = base.state_db.resolve()
         if overrides:
             base = replace(base, **overrides)  # type: ignore[arg-type]
