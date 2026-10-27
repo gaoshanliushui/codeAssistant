@@ -215,6 +215,152 @@
   .sug .arw { margin-left: auto; color: var(--muted); flex: none; }
   .disclaimer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 28px; }
 
+  /* ---------- 目录页（专家 / 技能） ---------- */
+  .catalog-page { max-width: 1400px; margin: 0 auto; padding: 0 24px 40px; }
+  .cat-body { display: flex; align-items: flex-start; gap: 20px; }
+  .cat-main { flex: 1; min-width: 0; }
+  .cat-top {
+    position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px;
+    padding: 14px 0 12px; background: rgba(255,255,255,.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .cat-tabs { display: flex; gap: 4px; }
+  .cat-tab {
+    display: flex; align-items: center; gap: 6px; border: 0; background: transparent;
+    padding: 7px 14px; border-radius: 9px; font-size: 14px; color: var(--muted); cursor: pointer;
+  }
+  .cat-tab:hover { background: var(--bg-soft); color: var(--text2); }
+  .cat-tab.active { background: var(--bg-soft2); color: var(--text); font-weight: 600; }
+  .cat-search { margin-left: auto; position: relative; }
+  .cat-search input {
+    width: 220px; padding: 7px 12px 7px 32px; font: inherit; font-size: 13.5px;
+    border: 1px solid var(--border); border-radius: 9px; background: var(--bg-soft); color: var(--text);
+  }
+  .cat-search input:focus { outline: none; border-color: var(--border2); background: #fff; }
+  .cat-search .ico {
+    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); pointer-events: none; display: grid; place-items: center;
+  }
+  .cat-bar { display: flex; align-items: center; gap: 10px; padding: 14px 0 6px; }
+  .cat-filters { display: flex; align-items: center; gap: 8px; flex: 1; overflow: hidden; }
+  .cat-filters-scroll { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+  .cat-filters-scroll::-webkit-scrollbar { display: none; }
+  .cat-chip {
+    flex: none; border: 1px solid transparent; background: transparent; border-radius: 16px;
+    padding: 5px 13px; font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap;
+  }
+  .cat-chip:hover { color: var(--text2); background: var(--bg-soft); }
+  .cat-chip.on { background: var(--bg-soft2); color: var(--text); font-weight: 600; }
+  .cat-sorts { display: flex; gap: 2px; flex: none; }
+  .cat-sort {
+    border: 0; background: transparent; padding: 5px 10px; border-radius: 8px;
+    font-size: 13px; color: var(--muted); cursor: pointer;
+  }
+  .cat-sort:hover { color: var(--text2); }
+  .cat-sort.on { color: var(--text); font-weight: 600; background: var(--bg-soft2); }
+
+  .cat-grid {
+    display: grid; gap: 12px; margin-top: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+  .cat-body.has-detail .cat-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+
+  /* ---------- 详情面板 ---------- */
+  .cat-detail {
+    flex: none; width: 400px; position: sticky; top: 74px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: #fff; max-height: calc(100vh - 100px); overflow-y: auto;
+  }
+  @media (max-width: 1100px) {
+    .cat-body { flex-direction: column; }
+    .cat-detail { width: 100%; position: static; max-height: none; }
+  }
+  .dt-head {
+    display: flex; gap: 12px; padding: 16px 16px 12px; border-bottom: 1px solid var(--border);
+  }
+  .dt-head .body { min-width: 0; }
+  .dt-head .nm { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .dt-head .role { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .dt-head .ds { font-size: 12.5px; color: var(--muted); margin-top: 5px; }
+  .dt-close {
+    margin-left: auto; align-self: flex-start; width: 26px; height: 26px; border-radius: 8px;
+    border: 0; background: transparent; color: var(--muted); cursor: pointer; display: grid;
+    place-items: center; font-size: 15px; line-height: 1;
+  }
+  .dt-close:hover { background: var(--bg-soft2); color: var(--text); }
+  .dt-sec { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .dt-sec:last-child { border-bottom: 0; }
+  .dt-sec h4 {
+    margin: 0 0 9px; font-size: 11.5px; font-weight: 600; color: var(--muted);
+    letter-spacing: .6px; text-transform: uppercase;
+  }
+  .dt-kv { display: flex; flex-wrap: wrap; gap: 6px; }
+  .dt-kv span {
+    font-size: 12px; color: var(--text2); background: var(--bg-soft2);
+    border-radius: 6px; padding: 2px 8px; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .dt-kv span.hi { background: rgba(245,165,36,.14); color: #b45309; }
+  .dt-kv span.hi::before {
+    content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--warn);
+  }
+  .dt-members { display: flex; flex-direction: column; gap: 8px; }
+  .dt-member { display: flex; gap: 9px; align-items: flex-start; }
+  .dt-member .av {
+    width: 26px; height: 26px; border-radius: 8px; flex: none; color: #fff;
+    display: grid; place-items: center; font-size: 12px; font-weight: 600;
+  }
+  .dt-member .nm { font-size: 13px; font-weight: 600; }
+  .dt-member .nm .lead {
+    font-size: 10.5px; color: var(--accent); background: var(--accent-soft);
+    border-radius: 4px; padding: 1px 5px; margin-left: 5px; font-weight: 500;
+  }
+  .dt-member .rl { font-size: 11.5px; color: var(--muted); }
+  .dt-pre {
+    margin: 0; background: var(--bg-soft); border: 1px solid var(--border); border-radius: 9px;
+    padding: 11px 12px; font-size: 12px; line-height: 1.65; color: var(--text2);
+    white-space: pre-wrap; word-break: break-word; max-height: 340px; overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .dt-foot { padding: 14px 16px; display: flex; gap: 8px; }
+  .dt-foot button {
+    flex: 1; padding: 9px 12px; border-radius: 9px; font-size: 13px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); background: #fff; color: var(--text2);
+  }
+  .dt-foot button.primary { background: var(--text); color: #fff; border-color: var(--text); }
+  .dt-foot button:hover { border-color: var(--border2); }
+  .dt-foot button.primary:hover { opacity: .88; }
+  .dt-path { font-size: 11.5px; color: var(--muted); word-break: break-all; }
+  .cat-card {
+    background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px; cursor: pointer; display: flex; gap: 12px; transition: .15s;
+  }
+  .cat-card:hover { border-color: var(--border2); box-shadow: var(--shadow); }
+  .cat-card.on { border-color: var(--accent); background: rgba(91,140,255,.05); }
+  .cat-avatar {
+    width: 44px; height: 44px; border-radius: 12px; flex: none; color: #fff;
+    display: grid; place-items: center; font-size: 18px; font-weight: 600;
+  }
+  .cat-card .body { min-width: 0; flex: 1; }
+  .cat-card .nm { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .cat-card .nm .role { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .cat-card .ds {
+    color: var(--muted); font-size: 12.5px; margin-top: 4px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .cat-card .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+  .cat-card .tags span {
+    font-size: 11.5px; color: var(--text2); background: var(--bg-soft2);
+    border-radius: 5px; padding: 1px 7px;
+  }
+  .cat-card .foot {
+    margin-top: 10px; font-size: 11.5px; color: var(--muted);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .cat-card .foot .warn { color: var(--warn); }
+  .cat-empty { padding: 60px 0; text-align: center; color: var(--muted); font-size: 13.5px; }
+
   /* ---------- 对话 ---------- */
   .chat { max-width: 820px; margin: 0 auto; padding: 18px 24px 8px; }
   .chat-head {
@@ -362,6 +508,45 @@
     </button>
 
     <div class="scroll" id="scroll">
+      <section class="catalog-page" id="catalogPage" hidden>
+        <div class="cat-top">
+          <div class="cat-tabs" id="catTabs">
+            <button class="cat-tab active" data-tab="teams">专家团</button>
+            <button class="cat-tab" data-tab="experts">专家</button>
+            <button class="cat-tab" data-tab="skills">技能</button>
+          </div>
+          <div class="cat-search">
+            <span class="ico">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+                <circle cx="7" cy="7" r="4.5" /><path d="M10.5 10.5 14 14" />
+              </svg>
+            </span>
+            <input id="catSearch" type="text" placeholder="搜索专家 / 技能" spellcheck="false" />
+          </div>
+        </div>
+        <div class="cat-body" id="catBody">
+          <div class="cat-main">
+            <div class="cat-bar">
+              <div class="cat-filters">
+                <div class="cat-filters-scroll" id="catFilters"></div>
+              </div>
+              <button class="chip-scroll" id="catFilterNext" title="更多">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 4l4 4-4 4" />
+                </svg>
+              </button>
+              <div class="cat-sorts" id="catSorts">
+                <button class="cat-sort on" data-sort="all">综合</button>
+                <button class="cat-sort" data-sort="hot">最热</button>
+                <button class="cat-sort" data-sort="recent">最近</button>
+              </div>
+            </div>
+            <div class="cat-grid" id="catGrid"></div>
+          </div>
+          <aside class="cat-detail" id="catDetail" hidden></aside>
+        </div>
+      </section>
+
       <section class="home" id="home">
         <h1 class="hero">CodeAssistant，我帮你</h1>
 
@@ -435,7 +620,11 @@ let mode = "expert";          // 分段控件：expert | team
 let busy = false;
 let catalog = { experts: [], teams: [], skills: [] };
 let health = {};
-let sideView = "recent";      // 侧栏下半区：recent | catalog
+let page = "home";            // 主区域当前页：home | chat | catalog
+let catTab = "teams";         // 目录页分页：teams | experts | skills
+let catFilter = "全部";
+let catSort = "all";          // all | hot | recent
+let catQuery = "";
 let sessions = [];            // 服务端会话列表
 let currentSessionId = null;  // 当前对话的会话 ID
 const steps = new Map();
@@ -478,7 +667,8 @@ async function loadSessions() {
   } catch (e) {
     sessions = [];
   }
-  if (sideView === "recent") renderSideList();
+  renderSideList();
+  if (page === "catalog") renderCatalog();
 }
 
 /** 拉回某个会话的完整对话记录，并把当前上下文切到它。 */
@@ -520,15 +710,6 @@ function renderSideList() {
   const box = $("sideList");
   box.innerHTML = "";
 
-  if (sideView === "catalog") {
-    const filter = el("input", "filter");
-    filter.placeholder = "搜索专家 / 技能";
-    filter.oninput = () => renderCatalogItems(filter.value.trim());
-    box.appendChild(filter);
-    renderCatalogItems("");
-    return;
-  }
-
   box.appendChild(el("div", "list-h", "最近"));
   if (!sessions.length) {
     box.appendChild(el("div", "empty", "还没有会话记录"));
@@ -544,48 +725,320 @@ function renderSideList() {
   });
 }
 
-function renderCatalogItems(keyword) {
-  const box = $("sideList");
-  [...box.querySelectorAll(".grp, .rec, .empty")].forEach(n => n.remove());
-  const kw = keyword.toLowerCase();
+/* ---------- 目录页（右侧展示专家 / 专家团 / 技能） ---------- */
+const AVATAR_COLORS = ["#5b8cff", "#7c5cff", "#0ea5a4", "#e07a3f", "#d2455a", "#3f8ae0", "#8a6d3f"];
 
-  const teams = catalog.teams.filter(t => !kw || t.name.toLowerCase().includes(kw) || (t.display_name || "").toLowerCase().includes(kw));
-  const experts = catalog.experts.filter(e => !kw || e.name.toLowerCase().includes(kw) || (e.display_name || "").toLowerCase().includes(kw));
-  const skills = catalog.skills.filter(s => !kw || s.name.toLowerCase().includes(kw) || (s.description || "").toLowerCase().includes(kw));
-
-  const addItem = (label, sub, active, onClick) => {
-    const b = el("button", "rec" + (active ? " on" : ""));
-    b.innerHTML = `<span class="t">${esc(label)}</span>` + (sub ? `<span class="ts">${esc(sub)}</span>` : "");
-    b.onclick = onClick;
-    box.appendChild(b);
-  };
-
-  if (teams.length) {
-    box.appendChild(el("div", "grp", "专家团"));
-    teams.forEach(t => addItem(t.display_name || t.name, t.mode, target.team === t.name, () => selectTeam(t.name)));
-  }
-  if (experts.length) {
-    box.appendChild(el("div", "grp", "专家"));
-    experts.forEach(e => addItem(e.display_name || e.name, "", target.expert === e.name, () => selectExpert(e.name)));
-  }
-  if (skills.length) {
-    box.appendChild(el("div", "grp", "技能"));
-    skills.forEach(s => addItem(s.name, "", false, () => {
-      $("input").value = "/ " + s.name + " ";
-      $("input").focus();
-      autosize();
-    }));
-  }
-  if (!teams.length && !experts.length && !skills.length) {
-    box.appendChild(el("div", "empty", "没有匹配的专家或技能"));
-  }
+function avatarColor(seed) {
+  let hash = 0;
+  const text = String(seed || "");
+  for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
-function setSideView(view) {
-  sideView = view;
-  $("catalogBtn").classList.toggle("active", view === "catalog");
-  $("newTaskBtn").classList.toggle("active", view === "recent" && !hasChat());
-  renderSideList();
+/** 某个专家 / 专家团被用过多少次（从会话记录里数）。 */
+function usageCount(kind, name) {
+  return sessions.filter(s => (kind === "team" ? s.team : s.expert) === name).length;
+}
+
+function catalogItems(tab) {
+  if (tab === "teams") {
+    return catalog.teams.map(t => ({
+      kind: "team",
+      name: t.name,
+      title: t.display_name || t.name,
+      role: t.mode === "parallel" ? "并行协作" : "主理人调度",
+      desc: t.description || "",
+      tags: t.member_names || t.members || [],
+      foot: [
+        `${(t.members || []).length} 位成员`,
+        t.lead ? "主理人 " + displayNameOf(t.lead) : "",
+      ],
+      hitl: [],
+    }));
+  }
+  if (tab === "experts") {
+    return catalog.experts.map(e => ({
+      kind: "expert",
+      name: e.name,
+      title: e.display_name || e.name,
+      role: e.profession || "",
+      desc: e.description || "",
+      tags: e.tags || [],
+      foot: [
+        `${(e.tools || []).length} 个工具`,
+        (e.skills || []).length ? `${e.skills.length} 个技能` : "",
+        (e.hitl || []).length ? `${e.hitl.length} 个审批点` : "",
+      ],
+      hitl: e.hitl || [],
+      builtin: e.source === "builtin",
+    }));
+  }
+  return catalog.skills.map(s => ({
+    kind: "skill",
+    name: s.name,
+    title: s.name,
+    role: s.source === "global" ? "全局技能" : "包内技能",
+    desc: s.description || "",
+    tags: (s.agents || []).length ? s.agents : (s.default ? ["所有专家"] : ["通用型专家"]),
+    foot: [
+      (s.scripts || []).length
+        ? `脚本：${s.scripts.slice(0, 3).join("、")}${s.scripts.length > 3 ? ` 等 ${s.scripts.length} 个` : ""}`
+        : "",
+      s.default ? "绑定所有专家" : "",
+    ],
+    hitl: [],
+  }));
+}
+
+function catalogFilters(tab, items) {
+  if (tab === "teams") {
+    const modes = [...new Set(items.map(i => i.role))];
+    return ["全部", ...modes];
+  }
+  if (tab === "experts") {
+    const tags = [...new Set(items.flatMap(i => i.tags))];
+    return ["全部", ...tags];
+  }
+  const roles = [...new Set(items.map(i => i.role))];
+  return ["全部", ...roles];
+}
+
+function renderCatalog() {
+  const tab = catTab;
+  const all = catalogItems(tab);
+  const kw = catQuery.toLowerCase();
+
+  let items = all.filter(item =>
+    !kw ||
+    item.name.toLowerCase().includes(kw) ||
+    item.title.toLowerCase().includes(kw) ||
+    item.desc.toLowerCase().includes(kw) ||
+    item.tags.some(t => t.toLowerCase().includes(kw))
+  );
+
+  // 筛选条
+  const filters = catalogFilters(tab, all);
+  const fbox = $("catFilters");
+  fbox.innerHTML = "";
+  filters.forEach(name => {
+    const b = el("button", "cat-chip" + (name === catFilter ? " on" : ""));
+    b.textContent = name;
+    b.onclick = () => { catFilter = name; renderCatalog(); };
+    fbox.appendChild(b);
+  });
+  if (catFilter && catFilter !== "全部") {
+    items = items.filter(item =>
+      tab === "teams" ? item.role === catFilter : item.tags.includes(catFilter)
+    );
+  }
+
+  // 排序
+  if (catSort === "hot") {
+    items = items.slice().sort((a, b) => usageCount(a.kind, a.name) - usageCount(b.kind, b.name)).reverse();
+  } else if (catSort === "recent") {
+    const lastUsed = {};
+    sessions.forEach(s => {
+      [s.expert, s.team].forEach(n => {
+        if (n) lastUsed[n] = Math.max(lastUsed[n] || 0, s.updated_at || 0);
+      });
+    });
+    items = items.slice().sort((a, b) => (lastUsed[b.name] || 0) - (lastUsed[a.name] || 0));
+  }
+
+  // 卡片
+  const grid = $("catGrid");
+  grid.innerHTML = "";
+  if (!items.length) {
+    grid.appendChild(el("div", "cat-empty", "没有匹配的" + (tab === "teams" ? "专家团" : tab === "experts" ? "专家" : "技能")));
+    return;
+  }
+  items.forEach(item => {
+    const card = el("div", "cat-card");
+    const selected = item.kind === "team" ? target.team === item.name : target.expert === item.name;
+    if (selected) card.classList.add("on");
+    const foot = (item.foot || []).filter(Boolean);
+    card.innerHTML =
+      `<div class="cat-avatar" style="background:${avatarColor(item.name)}">${esc(item.title.slice(0, 1))}</div>` +
+      `<div class="body">` +
+        `<div class="nm">${esc(item.title)}<span class="role">${esc(item.role)}</span></div>` +
+        `<div class="ds">${esc(item.desc)}</div>` +
+        (item.tags.length ? `<div class="tags">${item.tags.slice(0, 4).map(t => `<span>${esc(t)}</span>`).join("")}</div>` : "") +
+        (foot.length ? `<div class="foot">${foot.map(f => `<span>${esc(f)}</span>`).join("")}</div>` : "") +
+      `</div>`;
+    card.onclick = () => pickFromCatalog(item);
+    grid.appendChild(card);
+  });
+}
+
+function pickFromCatalog(item) {
+  openDetail(item.kind, item.name);
+}
+
+/* ---------- 详情面板 ---------- */
+function detailEndpoint(kind, name) {
+  if (kind === "team") return "/api/teams/" + encodeURIComponent(name);
+  if (kind === "skill") return "/api/skills/" + encodeURIComponent(name);
+  return "/api/experts/" + encodeURIComponent(name);
+}
+
+async function openDetail(kind, name) {
+  const panel = $("catDetail");
+  panel.hidden = false;
+  $("catBody").classList.add("has-detail");
+  panel.innerHTML = '<div class="dt-sec"><div class="empty">加载中…</div></div>';
+  let data;
+  try {
+    const resp = await fetch(detailEndpoint(kind, name));
+    if (!resp.ok) throw new Error("加载失败");
+    data = await resp.json();
+  } catch (e) {
+    panel.innerHTML = '<div class="dt-sec"><div class="empty">详情加载失败</div></div>';
+    return;
+  }
+  renderDetail(data);
+}
+
+function closeDetail() {
+  $("catDetail").hidden = true;
+  $("catBody").classList.remove("has-detail");
+}
+
+function detailSection(title, node) {
+  const sec = el("div", "dt-sec");
+  sec.appendChild(el("h4", null, title));
+  sec.appendChild(node);
+  return sec;
+}
+
+function renderDetail(data) {
+  const panel = $("catDetail");
+  panel.innerHTML = "";
+
+  // 头部
+  const head = el("div", "dt-head");
+  const role = data.kind === "team"
+    ? (data.mode === "parallel" ? "并行协作" : "主理人调度")
+    : data.kind === "skill"
+      ? (data.source === "global" ? "全局技能" : "包内技能")
+      : (data.profession || "");
+  head.innerHTML =
+    `<div class="cat-avatar" style="background:${avatarColor(data.name)}">${esc(
+      (data.display_name || data.name).slice(0, 1)
+    )}</div>` +
+    `<div class="body">` +
+      `<div class="nm">${esc(data.display_name || data.name)}<span class="role">${esc(role)}</span></div>` +
+      (data.description ? `<div class="ds">${esc(data.description)}</div>` : "") +
+    `</div>`;
+  const close = el("button", "dt-close", "✕");
+  close.onclick = closeDetail;
+  head.appendChild(close);
+  panel.appendChild(head);
+
+  if (data.kind === "expert") {
+    if ((data.tags || []).length) {
+      const box = el("div", "dt-kv");
+      data.tags.forEach(t => box.appendChild(el("span", null, esc(t))));
+      panel.appendChild(detailSection("标签", box));
+    }
+    if ((data.tools || []).length) {
+      const box = el("div", "dt-kv");
+      data.tools.forEach(tool => {
+        const chip = el("span", tool.requires_approval ? "hi" : null, esc(tool.name));
+        box.appendChild(chip);
+      });
+      panel.appendChild(detailSection(`工具（${data.tools.length}）`, box));
+    }
+    if ((data.hitl || []).length) {
+      const box = el("div", "dt-kv");
+      data.hitl.forEach(t => box.appendChild(el("span", "hi", esc(t))));
+      panel.appendChild(detailSection(`需要人工审批（${data.hitl.length}）`, box));
+    }
+    if ((data.skills || []).length) {
+      const box = el("div", "dt-kv");
+      data.skills.forEach(s => box.appendChild(el("span", null, esc(s))));
+      panel.appendChild(detailSection(`绑定技能（${data.skills.length}）`, box));
+    }
+    if (data.system_prompt) {
+      const pre = el("pre", "dt-pre", esc(data.system_prompt));
+      panel.appendChild(detailSection("系统提示词", pre));
+    }
+  }
+
+  if (data.kind === "team") {
+    const list = el("div", "dt-members");
+    (data.members || []).forEach(m => {
+      const row = el("div", "dt-member");
+      row.innerHTML =
+        `<span class="av" style="background:${avatarColor(m.name)}">${esc((m.display_name || m.name).slice(0, 1))}</span>` +
+        `<span><span class="nm">${esc(m.display_name || m.name)}${m.is_lead ? '<span class="lead">主理人</span>' : ""}</span>` +
+        `<span class="rl">${esc(m.profession || "")}</span></span>`;
+      list.appendChild(row);
+    });
+    panel.appendChild(detailSection(`成员（${(data.members || []).length}）`, list));
+  }
+
+  if (data.kind === "skill") {
+    const box = el("div", "dt-kv");
+    if (data.default) box.appendChild(el("span", null, "绑定所有专家"));
+    (data.agents || []).forEach(a => box.appendChild(el("span", null, esc(a))));
+    panel.appendChild(detailSection("绑定范围", box));
+
+    if ((data.scripts || []).length) {
+      const sbox = el("div", "dt-kv");
+      data.scripts.forEach(s => sbox.appendChild(el("span", null, esc("scripts/" + s))));
+      panel.appendChild(detailSection(`脚本（${data.scripts.length}）`, sbox));
+    }
+    if ((data.references || []).length) {
+      const rbox = el("div", "dt-kv");
+      data.references.forEach(s => rbox.appendChild(el("span", null, esc("references/" + s))));
+      panel.appendChild(detailSection(`参考资料（${data.references.length}）`, rbox));
+    }
+    if (data.instructions) {
+      const pre = el("pre", "dt-pre", esc(data.instructions));
+      panel.appendChild(detailSection("技能说明", pre));
+    }
+    if (data.path) {
+      panel.appendChild(detailSection("来源文件", el("div", "dt-path", esc(data.path))));
+    }
+  }
+
+  // 底部操作
+  const foot = el("div", "dt-foot");
+  if (data.kind === "skill") {
+    const use = el("button", "primary", "在任务中调用");
+    use.onclick = () => {
+      $("input").value = "/" + data.name + " ";
+      autosize();
+      closeDetail();
+      showPage("home");
+      $("input").focus();
+      toast("已填入 /" + data.name + "，补上任务即可发送");
+    };
+    foot.appendChild(use);
+  } else {
+    const use = el("button", "primary", data.kind === "team" ? "用这个专家团开始任务" : "用这个专家开始任务");
+    use.onclick = () => {
+      if (data.kind === "team") selectTeam(data.name);
+      else selectExpert(data.name);
+      closeDetail();
+      if (!hasChat()) showPage("home");
+      $("input").focus();
+      toast("已选定 " + (data.display_name || data.name));
+    };
+    foot.appendChild(use);
+  }
+  panel.appendChild(foot);
+}
+
+/** 右侧主区域有三个页面：首页 / 对话 / 目录。 */
+function showPage(name) {
+  page = name;
+  $("home").hidden = name !== "home";
+  $("chat").hidden = name !== "chat";
+  $("catalogPage").hidden = name !== "catalog";
+  $("dock").hidden = name !== "chat";
+  $("catalogBtn").classList.toggle("active", name === "catalog");
+  $("newTaskBtn").classList.toggle("active", name === "home" && !hasChat());
 }
 
 function hasChat() { return !$("chat").hidden; }
@@ -644,17 +1097,13 @@ function renderSuggests() {
 }
 
 function enterChat() {
-  $("home").hidden = true;
-  $("chat").hidden = false;
-  $("dock").hidden = false;
+  showPage("chat");
   $("dockComposer").appendChild(composer);
   $("newTaskBtn").classList.remove("active");
 }
 
 function newTask() {
-  $("chat").hidden = true;
-  $("home").hidden = false;
-  $("dock").hidden = true;
+  showPage("home");
   $("homeComposer").appendChild(composer);
   log.innerHTML = "";
   steps.clear();
@@ -680,6 +1129,7 @@ function selectExpert(name) {
   syncSeg();
   renderChips();
   renderSideList();
+  if (page === "catalog") renderCatalog();
   $("targetName").textContent = displayNameOf(name);
   $("targetTag").textContent = "专家";
 }
@@ -689,6 +1139,7 @@ function selectTeam(name) {
   syncSeg();
   renderChips();
   renderSideList();
+  if (page === "catalog") renderCatalog();
   $("targetName").textContent = displayNameOf(name);
   $("targetTag").textContent = "专家团";
 }
@@ -996,6 +1447,7 @@ async function loadCatalog() {
   catalog = await (await fetch("/api/catalog")).json();
   renderChips();
   renderSideList();
+  if (page === "catalog") renderCatalog();
 }
 
 async function loadHealth() {
@@ -1033,12 +1485,16 @@ $("input").addEventListener("input", () => { autosize(); syncSkillMenu(); });
 $("input").addEventListener("click", syncSkillMenu);
 $("input").addEventListener("blur", () => setTimeout(closeSkillMenu, 120));
 
-$("newTaskBtn").onclick = () => { newTask(); setSideView("recent"); };
-$("catalogBtn").onclick = () => setSideView(sideView === "catalog" ? "recent" : "catalog");
+$("newTaskBtn").onclick = () => newTask();
+$("catalogBtn").onclick = () => {
+  if (page === "catalog") { showPage(hasChat() ? "chat" : "home"); return; }
+  showPage("catalog");
+  renderCatalog();
+};
 $("searchBtn").onclick = () => {
-  setSideView("catalog");
-  const f = $("sideList").querySelector(".filter");
-  if (f) f.focus();
+  showPage("catalog");
+  renderCatalog();
+  $("catSearch").focus();
 };
 $("collapseBtn").onclick = () => {
   if (window.matchMedia("(max-width: 900px)").matches) {
@@ -1054,7 +1510,36 @@ $("reopenBtn").onclick = () => {
     document.body.classList.remove("side-collapsed");
   }
 };
-$("attachBtn").onclick = () => setSideView("catalog");
+$("attachBtn").onclick = () => {
+  catTab = "skills";
+  showPage("catalog");
+  renderCatalog();
+};
+
+$("catTabs").onclick = (e) => {
+  const btn = e.target.closest(".cat-tab");
+  if (!btn) return;
+  catTab = btn.dataset.tab;
+  catFilter = "全部";
+  [...$("catTabs").children].forEach(b => b.classList.toggle("active", b === btn));
+  closeDetail();
+  renderCatalog();
+};
+$("catSearch").addEventListener("input", (e) => {
+  catQuery = e.target.value.trim();
+  renderCatalog();
+});
+$("catSorts").onclick = (e) => {
+  const btn = e.target.closest(".cat-sort");
+  if (!btn) return;
+  catSort = btn.dataset.sort;
+  [...$("catSorts").children].forEach(b => b.classList.toggle("active", b === btn));
+  renderCatalog();
+};
+$("catFilterNext").onclick = () => {
+  const sc = $("catFilters");
+  sc.scrollBy({ left: sc.clientWidth * 0.8, behavior: "smooth" });
+};
 
 $("moreBtn").onclick = (e) => {
   e.stopPropagation();

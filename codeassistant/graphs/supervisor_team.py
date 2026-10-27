@@ -47,7 +47,7 @@ LEAD_SYSTEM_PROMPT = """你是专家团的主理人（交付总监）。
 1. 拆解任务，判断下一步该交给哪位成员；
 2. 给成员下达清晰、聚焦的子任务（说明交付什么、什么标准算完成）；
 3. 审阅成员回传的产出，必要时要求补做或转交给另一位成员；
-4. 成员全部完成后，汇编最终交付报告。
+4. 成员全部完成后，把产出整合成**用户要的交付物本身**（文章、方案、代码、报告本体）。
 
 铁律：
 - 所有成员产出都先回传给你，由你决定转交给谁，成员之间不直连；
@@ -195,18 +195,21 @@ class SupervisorTeam:
         return FINISH, "所有成员均已产出，准备汇编。"
 
     async def finalize(self, state: TeamState) -> dict[str, Any]:
-        """主理人汇编最终交付报告。"""
+        """主理人把成员产出整合成**用户要的交付物**。"""
 
         writer = get_writer()
         record = state.get("record") or {}
         merged = merge_team_outputs(self.team.name, record, None)
+        task = state.get("task", "")
 
         prompt = HumanMessage(
             content=(
+                f"用户任务：\n{task or '（未提供）'}\n\n"
                 "各位成员的产出如下：\n\n"
                 f"{summarize_deliverables(record)}\n\n"
-                "请以主理人身份汇编最终交付报告：包含总体结论、各成员贡献、"
-                "遗留风险与下一步建议。"
+                "请直接完成用户的任务：把成员产出整合成用户要的**交付物本身**"
+                "（文章、方案、代码、报告本体等），不要汇报团队协作过程、"
+                "成员分工或下一步计划。"
             )
         )
         try:
@@ -214,7 +217,7 @@ class SupervisorTeam:
                 [
                     SystemMessage(
                         f"你是{self.team.display_name or self.team.name}的主理人。"
-                        "所有成员产出都经过你汇总，请给出最终交付报告。"
+                        "所有成员产出都经过你汇总，请直接交付用户要的成果本身。"
                     ),
                     prompt,
                 ]

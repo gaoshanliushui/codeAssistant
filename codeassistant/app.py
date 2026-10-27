@@ -107,6 +107,13 @@ class CodeAssistant:
     def list_catalog(self) -> dict[str, Any]:
         """专家 / 专家团 / 技能目录。"""
 
+        member_names = {
+            team.name: [
+                member.display_name or member.name
+                for member in self.registry.team_members(team)
+            ]
+            for team in self.registry.list_teams()
+        }
         return {
             "experts": [
                 {
@@ -114,6 +121,7 @@ class CodeAssistant:
                     "display_name": config.display_name,
                     "profession": config.profession,
                     "description": config.description,
+                    "tags": list(config.tags),
                     "tools": list(config.tools),
                     "skills": list(config.skills),
                     "hitl": list(config.hitl.tools),
@@ -128,6 +136,7 @@ class CodeAssistant:
                     "description": team.description,
                     "lead": team.lead,
                     "members": list(team.members),
+                    "member_names": member_names.get(team.name, []),
                     "mode": team.mode,
                 }
                 for team in self.registry.list_teams()
@@ -163,6 +172,96 @@ class CodeAssistant:
 
         session = self.sessions.get(session_id)
         return session.to_dict() if session is not None else None
+
+    # -- 详情 -------------------------------------------------------------
+
+    def expert_detail(self, name: str) -> dict[str, Any] | None:
+        """某个专家的完整档案（含系统提示词与工具清单）。"""
+
+        config = self.registry.get_expert(name)
+        if config is None:
+            return None
+        specs = {
+            spec.name: spec for spec in self.registry.tool_specs_for(config)
+        }
+        return {
+            "kind": "expert",
+            "name": config.name,
+            "display_name": config.display_name,
+            "profession": config.profession,
+            "description": config.description,
+            "tags": list(config.tags),
+            "tools": [
+                {
+                    "name": tool,
+                    "risk": getattr(specs.get(tool), "risk", "low"),
+                    "requires_approval": bool(
+                        getattr(specs.get(tool), "requires_approval", False)
+                    ),
+                }
+                for tool in config.tools
+            ],
+            "skills": list(config.skills),
+            "hitl": list(config.hitl.tools),
+            "source": config.source,
+            "system_prompt": config.system_prompt,
+            "memory_scope": config.memory_scope,
+            "max_turns": config.max_turns,
+        }
+
+    def team_detail(self, name: str) -> dict[str, Any] | None:
+        """某个专家团的完整档案（含成员清单）。"""
+
+        team = self.registry.get_team(name)
+        if team is None:
+            return None
+        members = []
+        # 主理人也是成员，只是名单里排第一
+        ordered = [team.lead] + [m for m in team.members if m != team.lead]
+        for member_name in ordered:
+            member = self.registry.get_expert(member_name)
+            if member is None:
+                continue
+            members.append(
+                {
+                    "name": member.name,
+                    "display_name": member.display_name or member.name,
+                    "profession": member.profession,
+                    "description": member.description,
+                    "tags": list(member.tags),
+                    "is_lead": member.name == team.lead,
+                }
+            )
+        return {
+            "kind": "team",
+            "name": team.name,
+            "display_name": team.display_name,
+            "description": team.description,
+            "lead": team.lead,
+            "mode": team.mode,
+            "max_rounds": team.max_rounds,
+            "source": team.source,
+            "members": members,
+        }
+
+    def skill_detail(self, name: str) -> dict[str, Any] | None:
+        """某个技能的完整档案（含 SKILL.md 正文）。"""
+
+        skill = self.registry.skills.get(name)
+        if skill is None:
+            return None
+        return {
+            "kind": "skill",
+            "name": skill.name,
+            "description": skill.description,
+            "instructions": skill.instructions,
+            "source": skill.source,
+            "agents": list(skill.agents),
+            "default": skill.default,
+            "scripts": list(skill.scripts),
+            "references": list(skill.references),
+            "path": str(skill.path) if skill.path else "",
+        }
 
     def _record_event(self, session_id: str, event: StreamEvent) -> None:
         """把专家 / 专家团的产出写进会话记录。"""

@@ -9,6 +9,9 @@
 * ``GET  /api/health``       健康检查
 * ``GET  /api/sessions``     会话列表（可回看的对话记录）
 * ``GET  /api/sessions/{id}`` 某个会话的完整对话记录
+* ``GET  /api/experts/{name}``  某个专家的完整档案
+* ``GET  /api/teams/{name}``    某个专家团的完整档案
+* ``GET  /api/skills/{name}``   某个技能的完整档案
 
 审批是**异步挂起**的：SSE 流在审批点停住，前端弹出审批卡片，
 用户点确认后调用 ``/api/approvals``，被挂起的执行随即从子图断点恢复。
@@ -198,6 +201,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         data = assistant.get_session(session_id)
         if data is None:
             raise HTTPException(status_code=404, detail="会话不存在")
+        return JSONResponse(data)
+
+    @api.get("/api/experts/{name}")
+    async def expert_detail(name: str) -> JSONResponse:
+        """某个专家的完整档案。"""
+
+        data = assistant.expert_detail(name)
+        if data is None:
+            raise HTTPException(status_code=404, detail="专家不存在")
+        return JSONResponse(data)
+
+    @api.get("/api/teams/{name}")
+    async def team_detail(name: str) -> JSONResponse:
+        """某个专家团的完整档案。"""
+
+        data = assistant.team_detail(name)
+        if data is None:
+            raise HTTPException(status_code=404, detail="专家团不存在")
+        return JSONResponse(data)
+
+    @api.get("/api/skills/{name}")
+    async def skill_detail(name: str) -> JSONResponse:
+        """某个技能的完整档案（含 SKILL.md 正文）。"""
+
+        data = assistant.skill_detail(name)
+        if data is None:
+            raise HTTPException(status_code=404, detail="技能不存在")
         return JSONResponse(data)
 
     @api.get("/")

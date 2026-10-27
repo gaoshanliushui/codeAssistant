@@ -382,9 +382,14 @@ def build_expert_graph(
         # ---------------- 阶段 1：审批 ----------------
         # 白名单外的工具直接判负——不该为反正会被拒绝的调用去打扰用户
         reviewable = [call for call in pending if call["name"] in allowed_tools]
-        verdicts: list[tuple[dict[str, Any], bool, str]] = [
-            (call, False, "not-allowed") for call in pending if call["name"] not in allowed_tools
-        ]
+        # 结论按调用 id 存，最后**按模型给的调用顺序**回结果。
+        # 顺序必须和 tool_calls 一一对应：MiniMax / DeepSeek 这类严格校验的接口
+        # 遇到「结果顺序对不上」会直接报 tool call and result not match。
+        verdicts: dict[str, tuple[bool, str]] = {
+            call["id"]: (False, "not-allowed")
+            for call in pending
+            if call["name"] not in allowed_tools
+        }
 
         if policy.mode == "static":
             needs_batch_review = any(
@@ -398,7 +403,8 @@ def build_expert_graph(
                     # 前端已统一放行，不再重复打断
                     approved = pre_registered.state == "approved"
                     note = pre_registered.decision_note
-                    verdicts.extend((call, approved, note) for call in reviewable)
+                    for call in reviewable:
+                        verdicts[call["id"]] = (approved, note)
                 else:
                     batch_request = center.create(
                         expert=expert_name,
@@ -426,17 +432,19 @@ def build_expert_graph(
                         )
                     decision = interrupt(batch_payload)
                     approved, note = parse_resume_value(decision)
-                    verdicts.extend((call, approved, note) for call in reviewable)
+                    for call in reviewable:
+                        verdicts[call["id"]] = (approved, note)
         else:
             for call in reviewable:
                 name = call["name"]
                 if name not in approval_required:
-                    verdicts.append((call, True, ""))
+                    verdicts[call["id"]] = (True, "")
                     continue
                 pre_registered = lookup_decision(center, thread_id, expert_name, call, pending)
                 if pre_registered is not None:
-                    verdicts.append(
-                        (call, pre_registered.state == "approved", pre_registered.decision_note)
+                    verdicts[call["id"]] = (
+                        pre_registered.state == "approved",
+                        pre_registered.decision_note,
                     )
                     continue
                 spec = TOOL_SPECS.get(name)
@@ -459,11 +467,13 @@ def build_expert_graph(
                     )
                 decision = interrupt(request.to_payload())
                 approved, note = parse_resume_value(decision)
-                verdicts.append((call, approved, note))
+                verdicts[call["id"]] = (approved, note)
 
         # ---------------- 阶段 2：执行 ----------------
         messages: list[AnyMessage] = []
-        for call, approved, note in verdicts:
+        # 严格按模型给的调用顺序回结果——顺序必须和 tool_calls 对齐
+        for call in pending:
+            approved, note = verdicts.get(call["id"], (False, "未处理"))
             name = call["name"]
             args = call["args"]
 

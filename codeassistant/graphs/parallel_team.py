@@ -100,24 +100,27 @@ class ParallelTeam:
         return sends
 
     async def reduce(self, state: TeamState) -> dict[str, Any]:
-        """汇总所有成员的并行产出。"""
+        """汇总所有成员的并行产出，直接交付用户要的东西。"""
 
         writer = get_writer()
         record = state.get("record") or {}
         merged = merge_team_outputs(self.team.name, record, None)
+        task = state.get("task", "")
 
         try:
             reply = await self.llm.ainvoke(
                 [
                     SystemMessage(
                         f"你是{self.team.display_name or self.team.name}的汇编者，"
-                        "负责把成员的并行产出合并成一份结论。"
+                        "负责把成员的并行产出合并成用户要的交付物。"
                     ),
                     HumanMessage(
                         content=(
+                            f"用户任务：\n{task or '（未提供）'}\n\n"
                             "成员产出如下：\n\n"
                             f"{summarize_deliverables(record)}\n\n"
-                            "请合并这些产出，指出共识、分歧与需要人工决策的地方。"
+                            "请直接完成用户的任务：把成员产出合并成用户要的**交付物本身**"
+                            "（文章、方案、代码、报告本体等），不要汇报协作过程。"
                         )
                     ),
                 ]

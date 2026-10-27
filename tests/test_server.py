@@ -129,6 +129,48 @@ async def test_chat_creates_a_session_record(client: httpx.AsyncClient):
     assert detail["turns"][0]["text"] == "记录一下这个会话"
 
 
+# --------------------------------------------------------------------------
+# 详情：专家 / 专家团 / 技能
+# --------------------------------------------------------------------------
+
+
+async def test_expert_detail(client: httpx.AsyncClient):
+    response = await client.get("/api/experts/sdt-backend")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["kind"] == "expert"
+    assert body["display_name"]
+    assert body["system_prompt"], "详情里应带系统提示词"
+    assert body["tools"], "详情里应带工具清单"
+    assert any(tool["name"] == "write_file" for tool in body["tools"])
+
+
+async def test_team_detail_lists_lead_and_members(client: httpx.AsyncClient):
+    response = await client.get("/api/teams/software-development-team")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["kind"] == "team"
+    leads = [m for m in body["members"] if m["is_lead"]]
+    assert len(leads) == 1, "主理人应当出现在成员列表里"
+    assert leads[0]["name"] == body["lead"]
+    assert len(body["members"]) >= 6
+
+
+async def test_skill_detail_includes_instructions(client: httpx.AsyncClient):
+    response = await client.get("/api/skills/code-review")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["kind"] == "skill"
+    assert body["instructions"], "详情里应带 SKILL.md 正文"
+    assert body["path"].endswith("SKILL.md")
+
+
+async def test_detail_of_unknown_name_is_404(client: httpx.AsyncClient):
+    for path in ("/api/experts/nope", "/api/teams/nope", "/api/skills/nope"):
+        response = await client.get(path)
+        assert response.status_code == 404, path
+
+
 async def test_approval_gate_blocks_until_resolved():
     """审批闸门：等待期间挂起，收到结论后放行。"""
 

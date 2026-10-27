@@ -492,3 +492,58 @@ async def test_second_turn_resets_per_task_state(tmp_path: Path, make_expert_con
     assert len(second["artifacts"]) == 1
     # 但对话记忆留着：两轮的用户消息都在
     assert len(second["messages"]) >= 4
+
+
+# --------------------------------------------------------------------------
+# 工具结果的顺序必须和模型的调用顺序一致
+# --------------------------------------------------------------------------
+
+
+async def test_tool_results_follow_the_models_call_order(
+    tmp_path: Path, make_expert_config, tool_registry
+):
+    """工具结果要按模型给的调用顺序回，否则严格校验的接口直接报错。
+
+    曾经的真实缺陷：白名单外的工具被判负时被排到了结果列表的最前面，
+    于是「结果顺序」和「tool_calls 顺序」对不上——
+    MiniMax 会报 ``invalid params, tool call and result not match``。
+    """
+
+    from codeassistant.graphs.expert import build_expert_graph
+
+    # 模型先调合法工具，再调一个白名单外的幻觉工具
+    script = [
+        {"content": "计划"},
+        {
+            "tool_calls": [
+                {"name": "list_files", "args": {"path": "."}, "id": "call_B"},
+                {"name": "web_search", "args": {"q": "x"}, "id": "call_A"},
+            ]
+        },
+        {"content": "结论"},
+    ]
+    config = make_expert_config("order", tools=("list_files",))
+    graph = build_expert_graph(
+        config,
+        llm=MockChat(model="mock", script=script),
+        tool_registry=tool_registry,
+        checkpointer=InMemorySaver(),
+    )
+    run_config = {"configurable": {"thread_id": "order"}}
+
+    async for _ in graph.astream({"task": "列一下目录"}, run_config, stream_mode=["custom"]):
+        pass
+    state = await graph.aget_state(run_config)
+
+    called_ids: list[str] = []
+    result_ids: list[str] = []
+    for message in state.values.get("messages") or []:
+        for call in getattr(message, "tool_calls", None) or []:
+            called_ids.append(call["id"])
+        tool_call_id = getattr(message, "tool_call_id", None)
+        if tool_call_id:
+            result_ids.append(tool_call_id)
+
+    assert called_ids == ["call_B", "call_A"], "模型是按这个顺序调的"
+    assert result_ids == called_ids, "工具结果必须一一对应且同序"
+    assert len(result_ids) == len(called_ids), "每个 tool_call 都要有结果"
