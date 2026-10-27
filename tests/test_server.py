@@ -101,6 +101,34 @@ async def test_approvals_endpoint_reports_unknown_request(client: httpx.AsyncCli
     assert response.json()["ok"] is False
 
 
+async def test_sessions_endpoint_lists_sessions(client: httpx.AsyncClient):
+    response = await client.get("/api/sessions")
+    assert response.status_code == 200
+    assert "sessions" in response.json()
+
+
+async def test_session_detail_returns_404(client: httpx.AsyncClient):
+    response = await client.get("/api/sessions/nope")
+    assert response.status_code == 404
+
+
+async def test_chat_creates_a_session_record(client: httpx.AsyncClient):
+    """跑一次任务后，应该能在会话列表里看到它，并能拉回完整记录。"""
+
+    async with client.stream("POST", "/api/chat", json={"task": "记录一下这个会话"}) as response:
+        async for line in response.aiter_lines():
+            if line.startswith("data:") and line[5:].strip() == "[DONE]":
+                break
+
+    listing = (await client.get("/api/sessions")).json()["sessions"]
+    assert listing, "跑完任务后应当留下会话记录"
+
+    detail = (await client.get(f"/api/sessions/{listing[0]['id']}")).json()
+    assert detail["title"] == "记录一下这个会话"
+    assert detail["turns"][0]["role"] == "user"
+    assert detail["turns"][0]["text"] == "记录一下这个会话"
+
+
 async def test_approval_gate_blocks_until_resolved():
     """审批闸门：等待期间挂起，收到结论后放行。"""
 

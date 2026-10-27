@@ -7,6 +7,8 @@
 * ``POST /api/chat``         以 SSE 流式执行任务（按专家维度实时吐进度）
 * ``POST /api/approvals``    对挂起的高危操作给出通过 / 拒绝
 * ``GET  /api/health``       健康检查
+* ``GET  /api/sessions``     会话列表（可回看的对话记录）
+* ``GET  /api/sessions/{id}`` 某个会话的完整对话记录
 
 审批是**异步挂起**的：SSE 流在审批点停住，前端弹出审批卡片，
 用户点确认后调用 ``/api/approvals``，被挂起的执行随即从子图断点恢复。
@@ -20,7 +22,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -182,6 +184,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "teams": report.touched_teams(),
             }
         )
+
+    @api.get("/api/sessions")
+    async def sessions() -> JSONResponse:
+        """会话列表（最近更新的在前），供侧栏「最近」使用。"""
+
+        return JSONResponse({"sessions": assistant.list_sessions()})
+
+    @api.get("/api/sessions/{session_id}")
+    async def session_detail(session_id: str) -> JSONResponse:
+        """某个会话的完整对话记录。"""
+
+        data = assistant.get_session(session_id)
+        if data is None:
+            raise HTTPException(status_code=404, detail="会话不存在")
+        return JSONResponse(data)
 
     @api.get("/")
     async def index() -> Any:

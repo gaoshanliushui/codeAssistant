@@ -408,6 +408,8 @@ let busy = false;
 let catalog = { experts: [], teams: [], skills: [] };
 let health = {};
 let sideView = "recent";      // 侧栏下半区：recent | catalog
+let sessions = [];            // 服务端会话列表
+let currentSessionId = null;  // 当前对话的会话 ID
 const steps = new Map();
 
 /* ---------- 基础工具 ---------- */
@@ -440,22 +442,49 @@ function fmtTime(ts) {
   return (d.getMonth() + 1) + "月" + d.getDate() + "日";
 }
 
-/* ---------- 最近任务（本地） ---------- */
-const RECENT_KEY = "codeassistant.recent";
-function loadRecent() {
+/* ---------- 会话记录（服务端持久化） ---------- */
+async function loadSessions() {
   try {
-    const raw = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
-    return Array.isArray(raw) ? raw : [];
-  } catch (e) { return []; }
-}
-function saveRecent(list) {
-  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) {}
-}
-function pushRecent(title) {
-  const list = loadRecent().filter(x => x.title !== title);
-  list.unshift({ id: Date.now().toString(36), title, ts: Date.now() });
-  saveRecent(list);
+    const data = await (await fetch("/api/sessions")).json();
+    sessions = data.sessions || [];
+  } catch (e) {
+    sessions = [];
+  }
   if (sideView === "recent") renderSideList();
+}
+
+/** 拉回某个会话的完整对话记录，并把当前上下文切到它。 */
+async function openSession(id) {
+  let data;
+  try {
+    data = await (await fetch("/api/sessions/" + encodeURIComponent(id))).json();
+  } catch (e) {
+    toast("拉取会话记录失败");
+    return;
+  }
+  log.innerHTML = "";
+  steps.clear();
+  currentSessionId = data.id || id;
+  (data.turns || []).forEach(turn => {
+    if (turn.role === "user") addMessage("你", turn.text, "user");
+    else addMessage(turn.label || (turn.role === "team" ? "专家团" : "专家"), turn.text);
+  });
+
+  target = { expert: data.expert || null, team: data.team || null };
+  if (target.expert) selectExpert(target.expert);
+  else if (target.team) selectTeam(target.team);
+  else {
+    mode = "expert";
+    syncSeg();
+    $("targetName").textContent = "自动路由";
+    $("targetTag").textContent = "自动路由";
+    renderChips();
+  }
+
+  enterChat();
+  renderSideList();
+  scrollBottom();
+  $("input").focus();
 }
 
 /* ---------- 侧栏 ---------- */
@@ -473,20 +502,16 @@ function renderSideList() {
   }
 
   box.appendChild(el("div", "list-h", "最近"));
-  const list = loadRecent();
-  if (!list.length) {
-    box.appendChild(el("div", "empty", "还没有任务记录"));
+  if (!sessions.length) {
+    box.appendChild(el("div", "empty", "还没有会话记录"));
     return;
   }
-  list.forEach(item => {
-    const b = el("button", "rec");
-    b.innerHTML = `<span class="t">${esc(item.title)}</span><span class="ts">${esc(fmtTime(item.ts))}</span>`;
-    b.title = item.title;
-    b.onclick = () => {
-      $("input").value = item.title;
-      $("input").focus();
-      autosize();
-    };
+  sessions.forEach(item => {
+    const b = el("button", "rec" + (item.id === currentSessionId ? " on" : ""));
+    const turns = item.turns || 0;
+    b.innerHTML = `<span class="t">${esc(item.title)}</span><span class="ts">${esc(fmtTime(item.updated_at * 1000))}</span>`;
+    b.title = `${item.title}（${turns} 条记录）`;
+    b.onclick = () => openSession(item.id);
     box.appendChild(b);
   });
 }
@@ -605,7 +630,10 @@ function newTask() {
   $("homeComposer").appendChild(composer);
   log.innerHTML = "";
   steps.clear();
+  currentSessionId = null;
   target = { expert: null, team: null };
+  mode = "expert";
+  syncSeg();
   $("targetName").textContent = "自动路由";
   $("targetTag").textContent = "自动路由";
   renderChips();
@@ -700,6 +728,10 @@ function showApproval(ev) {
 function handleEvent(ev) {
   const p = ev.payload || {};
   switch (ev.type) {
+    case "run_started":
+      // 服务端分配（或沿用）会话 ID，后续消息都挂在这个会话上
+      currentSessionId = p.session_id || currentSessionId;
+      break;
     case "orchestrator_route":
       $("targetName").textContent = p.target ? displayNameOf(p.target) : "自动路由";
       $("targetTag").textContent = p.route === "team" ? "专家团" : "专家";
@@ -745,9 +777,14 @@ async function send() {
   autosize();
   enterChat();
   addMessage("你", text, "user");
-  pushRecent(text);
 
-  const body = { task: text, session_id: null, expert: target.expert, team: target.team, mode: null };
+  const body = {
+    task: text,
+    session_id: currentSessionId,
+    expert: target.expert,
+    team: target.team,
+    mode: null,
+  };
 
   try {
     const resp = await fetch("/api/chat", {
@@ -778,6 +815,7 @@ async function send() {
     busy = false;
     $("sendBtn").disabled = false;
     $("input").focus();
+    loadSessions();
   }
 }
 
@@ -898,6 +936,7 @@ document.addEventListener("keydown", (e) => {
 renderSuggests();
 loadHealth();
 loadCatalog();
+loadSessions();
 renderSideList();
 $("input").focus();
 </script>

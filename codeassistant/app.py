@@ -33,6 +33,7 @@ from .observability import (
     scope_from_namespace,
 )
 from .registry import ExpertRegistry
+from .sessions import SessionStore
 from .settings import Settings
 from .tools.registry import ToolRegistry
 from .tools.sandbox import Sandbox
@@ -89,6 +90,8 @@ class CodeAssistant:
         self.approval_center = ApprovalCenter()
         self.event_bus = EventBus()
         self.checkpointer = build_checkpointer(self.settings)
+        #: 会话记录（可回看的对话流水，落在 .codeassistant/sessions.json）
+        self.sessions = SessionStore(self.settings.sessions_file)
         self.factory = ExpertGraphFactory(
             self.registry,
             self.settings,
@@ -147,6 +150,37 @@ class CodeAssistant:
 
     def get_team(self, name: str) -> TeamConfig | None:
         return self.registry.get_team(name)
+
+    # -- 会话记录 ---------------------------------------------------------
+
+    def list_sessions(self) -> list[dict[str, Any]]:
+        """会话列表，最近更新的排在前面。"""
+
+        return self.sessions.summaries()
+
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
+        """某个会话的完整对话记录（含逐轮内容）。"""
+
+        session = self.sessions.get(session_id)
+        return session.to_dict() if session is not None else None
+
+    def _record_event(self, session_id: str, event: StreamEvent) -> None:
+        """把专家 / 专家团的产出写进会话记录。"""
+
+        if event.type == EventType.EXPERT_COMPLETED:
+            self.sessions.append(
+                session_id,
+                "expert",
+                str(event.payload.get("text") or ""),
+                label=str(event.expert or ""),
+            )
+        elif event.type == EventType.TEAM_COMPLETED:
+            self.sessions.append(
+                session_id,
+                "team",
+                str(event.payload.get("text") or ""),
+                label=str(event.team or ""),
+            )
 
     # -- 执行 -------------------------------------------------------------
 
@@ -246,6 +280,9 @@ class CodeAssistant:
             )
             return
 
+        # 记下这一轮，等会儿可以在侧栏「最近」里翻出来
+        self.sessions.begin(sid, task, expert=expert or "", team=team or "")
+
         run_config = self._merge_config(config, thread_id)
 
         inputs: Any = payload
@@ -269,6 +306,7 @@ class CodeAssistant:
                         team=data.get("team") or ns_team or current_team,
                         payload=dict(data.get("payload") or {}),
                     )
+                    self._record_event(sid, event)
                     if event.type == EventType.ORCHESTRATOR_ROUTE:
                         # 记录路由结果，最终事件里要带上真正命中的目标
                         route = str(event.payload.get("route") or route)

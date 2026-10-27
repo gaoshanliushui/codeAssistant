@@ -259,7 +259,22 @@ def build_expert_graph(
                     "payload": {"text": plan_text},
                 }
             )
-        return {"plan": plan_text}
+        # 每个任务从干净的状态开始：iteration / findings / artifacts 这些是**本轮**的产物，
+        # 不重置的话，同一线程里聊第二轮时会把上一轮的计数和结论带过来——
+        # iteration 累积到 max_turns 之后工具循环就再也不执行了。
+        # ``messages`` 故意保留：那是跨轮记忆。
+        return {
+            "plan": plan_text,
+            "iteration": 0,
+            "pending_calls": [],
+            "findings": [],
+            "artifacts": [],
+            "record": {},
+            "status": "ok",
+            "summary": "",
+            "next_action": "",
+            "turns_used": 0,
+        }
 
     def act(state: ExpertState) -> dict[str, Any]:
         """决定下一步：要么发起工具调用，要么直接给出结论。"""

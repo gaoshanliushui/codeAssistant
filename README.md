@@ -316,13 +316,24 @@ default: false                           # 可选：true = 绑定给所有专家
 | `POST /api/chat` | SSE 流式执行，按专家维度实时吐进度 |
 | `POST /api/approvals` | 对挂起的高危操作给出通过 / 拒绝 |
 | `POST /api/reload` | 热重载专家包 |
+| `GET /api/sessions` | 会话列表（最近更新的在前） |
+| `GET /api/sessions/{id}` | 某个会话的完整对话记录 |
 
 界面结构（单文件 `web/index.html`，无前端依赖）：
 
 * **左侧栏**：新建任务 / 专家·技能（目录视图，带搜索过滤）/ 更多（热重载、复制工作区路径、服务信息），
-  下方是「最近」任务列表（浏览器本地记录），底部显示工作区路径与当前模型；
+  下方是「最近」会话列表（服务端持久化），底部显示工作区路径与当前模型；
 * **首页**：大标题 + 「专家 / 专家团」分段切换 + 一排快捷 chip（点 chip 即选定目标）+
-  大输入框 + 建议卡片；发消息后切换为对话流，输入框吸底，专家进度以状态条呈现。
+  大输入框 + 建议卡片；发消息后切换为对话流，输入框吸底，专家进度以状态条呈现；
+* **最近会话**：点开某条即从服务端拉回整段对话记录（`GET /api/sessions/{id}`），
+  并把当前上下文切到那个会话——可以接着聊，专家能看到上文。
+
+### 会话记录
+
+每次对话都会写进 `.codeassistant/sessions.json`（原子写入，可直接打开查看/编辑），
+记录的是**给人看的对话流水**：谁说了什么、哪个专家产出了什么结论。
+它与 LangGraph 的检查点（`.codeassistant/state.db`）是两回事——
+检查点存的是图的内部状态（消息、迭代计数），会话记录存的是可回看的历史。
 
 SSE 事件统一为 `{type, expert, team, node, payload, ts}`，
 `expert` 字段就是前端按专家维度展示进度的依据。
@@ -341,6 +352,7 @@ codeassistant/
 ├── registry.py        # 专家注册表、工具/技能绑定策略、热重载
 ├── llm.py             # LLM 抽象：OpenAI 兼容 / Anthropic / 离线 Mock
 ├── memory.py          # ★ 三层 thread_id 命名空间 + 混合 SQLite 检查点
+├── sessions.py        # 会话记录（可回看的对话流水，JSON 持久化）
 ├── approval.py        # ★ 人审中心
 ├── observability.py   # 统一流式事件
 ├── app.py             # 应用门面（CLI / Web 共用）

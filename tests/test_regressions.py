@@ -440,3 +440,55 @@ def test_missing_experts_dir_warns_on_stderr(tmp_path: Path, capsys):
     ExpertRegistry(settings)
 
     assert "专家包目录不存在" in capsys.readouterr().err
+
+
+# --------------------------------------------------------------------------
+# 同一会话里聊第二轮时，专家状态必须是干净的
+# --------------------------------------------------------------------------
+
+
+async def test_second_turn_resets_per_task_state(tmp_path: Path, make_expert_config, tool_registry):
+    """同一线程跑第二个任务时，iteration / artifacts 不能带上上一轮。
+
+    曾经的真实缺陷：``iteration`` 是**轮次内**的计数器，却存在检查点里，
+    跨轮累积到 ``max_turns`` 之后，工具循环会直接跳过 ``execute_tools``——
+    模型明明要求调工具，却被静默丢掉。
+    """
+
+    from codeassistant.graphs.expert import build_expert_graph
+
+    # 每轮四次模型调用：计划 → 调工具 → 结论 → 收尾总结，共两轮
+    script = []
+    for i in range(2):
+        script.append({"content": f"计划{i}"})
+        script.append(
+            {"tool_calls": [{"name": "list_files", "args": {"path": "."}, "id": f"c{i}"}]}
+        )
+        script.append({"content": f"过程{i}"})
+        script.append({"content": f"结论{i}"})
+
+    config = make_expert_config("multi-turn", tools=("list_files",))
+    graph = build_expert_graph(
+        config,
+        llm=MockChat(model="mock", script=script),
+        tool_registry=tool_registry,
+        checkpointer=InMemorySaver(),
+    )
+    run_config = {"configurable": {"thread_id": "multi-turn"}}
+
+    async for _ in graph.astream({"task": "第一轮"}, run_config, stream_mode=["custom"]):
+        pass
+    first = (await graph.aget_state(run_config)).values
+    assert first["iteration"] == 2
+    assert len(first["artifacts"]) == 1
+
+    async for _ in graph.astream({"task": "第二轮"}, run_config, stream_mode=["custom"]):
+        pass
+    second = (await graph.aget_state(run_config)).values
+
+    # 计数器回到本轮的起点，而不是接着上一轮累加
+    assert second["iteration"] == 2
+    # 产出物也是本轮的（上一轮那份被清掉了）
+    assert len(second["artifacts"]) == 1
+    # 但对话记忆留着：两轮的用户消息都在
+    assert len(second["messages"]) >= 4

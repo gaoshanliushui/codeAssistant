@@ -27,6 +27,8 @@ def settings(tmp_path: Path) -> Settings:
         experts_dir=EXPERTS_DIR,
         provider="mock",
         checkpointer="memory",
+        # 会话记录写进临时目录，别污染仓库里的 .codeassistant/
+        sessions_file=tmp_path / "sessions.json",
     )
 
 

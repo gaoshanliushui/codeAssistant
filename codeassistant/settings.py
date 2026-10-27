@@ -76,6 +76,8 @@ class Settings:
     #: 状态持久化
     checkpointer: CheckpointerKind = "sqlite"
     state_db: Path = field(default_factory=lambda: APP_DIR / "state.db")
+    #: 会话记录（可回看的对话流水）
+    sessions_file: Path = field(default_factory=lambda: APP_DIR / "sessions.json")
 
     #: 协作参数
     approval_mode: ApprovalMode = "dynamic"
@@ -139,6 +141,7 @@ class Settings:
             skills_dir=_path(skills_dir, "CODEASSISTANT_SKILLS_DIR", SKILLS_DIR),
             checkpointer=(_env("CODEASSISTANT_CHECKPOINTER", "sqlite") or "sqlite"),  # type: ignore[arg-type]
             state_db=_path(None, "CODEASSISTANT_STATE_DB", APP_DIR / "state.db"),
+            sessions_file=_path(None, "CODEASSISTANT_SESSIONS_FILE", APP_DIR / "sessions.json"),
             approval_mode=(_env("CODEASSISTANT_APPROVAL_MODE", "dynamic") or "dynamic"),  # type: ignore[arg-type]
             max_team_rounds=int(_env("CODEASSISTANT_MAX_TEAM_ROUNDS", "8") or 8),
             default_team_mode=(
@@ -150,6 +153,7 @@ class Settings:
         base.experts_dir = base.experts_dir.resolve()
         base.skills_dir = base.skills_dir.resolve()
         base.state_db = base.state_db.resolve()
+        base.sessions_file = base.sessions_file.resolve()
         if overrides:
             base = replace(base, **overrides)  # type: ignore[arg-type]
         return base
