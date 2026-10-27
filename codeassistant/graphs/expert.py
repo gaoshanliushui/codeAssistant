@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Annotated, Any, TypedDict
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -145,7 +146,29 @@ def lookup_decision(
     return None
 
 
-def _build_task_prompt(state: ExpertState) -> str:
+#: 技能调用的书写形式：``/技能名``
+#: —— 必须是独立的一个词（前是空白或开头，后是空白或结尾），
+#: 否则 ``/usr/local/bin`` 这样的路径会被误当成技能调用。
+SKILL_COMMAND_PATTERN = re.compile(r"(?:(?<=\s)|^)/([\w\-]+)(?=\s|$)")
+
+
+def match_skill_commands(task: str, skills: list[Skill]) -> list[Skill]:
+    """挑出任务里 ``/技能名`` 形式显式调用的技能。
+
+    只在**该专家绑定的技能**里匹配——别的专家的技能不该被顺手带进来。
+    """
+
+    if not task or not skills:
+        return []
+    matched: list[Skill] = []
+    for token in SKILL_COMMAND_PATTERN.findall(task):
+        for skill in skills:
+            if skill.name == token and skill not in matched:
+                matched.append(skill)
+    return matched
+
+
+def _build_task_prompt(state: ExpertState, skills: list[Skill] | None = None) -> str:
     """把任务 + 上下文 + 计划拼成用户消息。"""
 
     task = state.get("task", "")
@@ -157,6 +180,14 @@ def _build_task_prompt(state: ExpertState) -> str:
         blocks.append(f"本次聚焦：{focus}")
     if context:
         blocks.append("背景信息：\n" + "\n".join(f"- {item}" for item in context))
+    # 用户用 ``/技能名`` 显式点了技能：直接把说明带上，
+    # 省得模型再去判断「要不要载入这个技能」
+    invoked = match_skill_commands(task, skills or [])
+    if invoked:
+        blocks.append(
+            "已载入技能说明（按用户点选载入，请遵循其中的步骤）：\n"
+            + "\n\n".join(skill.to_prompt() for skill in invoked)
+        )
     if plan:
         blocks.append(f"执行计划：\n{plan}")
     blocks.append("请完成任务并给出结论。")
@@ -242,7 +273,7 @@ def build_expert_graph(
         writer = get_writer()
         prompt = (
             "请针对下面的任务给出 3-5 步的简短执行计划（只列步骤，不要展开）。\n\n"
-            f"{_build_task_prompt(state)}"
+            f"{_build_task_prompt(state, bound_skills)}"
         )
         try:
             reply = llm.invoke(
@@ -285,7 +316,7 @@ def build_expert_graph(
         messages: list[AnyMessage] = [
             SystemMessage(system_prompt),
             *history,
-            HumanMessage(_build_task_prompt(state)),
+            HumanMessage(_build_task_prompt(state, bound_skills)),
         ]
         try:
             if selected_tools:

@@ -10,7 +10,11 @@ from langgraph.types import Command
 
 from codeassistant.approval import ApprovalCenter
 from codeassistant.configs import HitlPolicy
-from codeassistant.graphs.expert import build_expert_graph
+from codeassistant.graphs.expert import (
+    _build_task_prompt,
+    build_expert_graph,
+    match_skill_commands,
+)
 from codeassistant.llm import MockChat
 from codeassistant.registry import ExpertRegistry
 from codeassistant.settings import Settings
@@ -401,3 +405,104 @@ def test_skill_render_index(make_expert_config):
     assert "可用技能" in index
     assert "- a：甲" in index
     assert SkillRegistry.render_index([]) == ""
+
+
+# --------------------------------------------------------------------------
+# ``/技能名`` —— 输入框里点选技能后写进任务的那一串
+# --------------------------------------------------------------------------
+
+
+def test_match_skill_commands_finds_named_skill():
+    skills = [Skill(name="stats-skill"), Skill(name="other")]
+    matched = match_skill_commands("/stats-skill 帮我统计", skills)
+    assert [s.name for s in matched] == ["stats-skill"]
+
+
+def test_match_skill_commands_ignores_unbound_names():
+    """没绑定的技能名不该被带进来。"""
+
+    skills = [Skill(name="stats-skill")]
+    assert match_skill_commands("/not-bound 做点事", skills) == []
+
+
+def test_match_skill_commands_ignores_path_like_slash():
+    """路径里的斜杠不是技能调用。"""
+
+    skills = [Skill(name="usr"), Skill(name="stats-skill")]
+    assert match_skill_commands("看看 /usr/local/bin", skills) == []
+
+
+def test_task_prompt_carries_invoked_skill():
+    skill = Skill(name="stats-skill", description="统计技能", instructions="请先运行脚本再下结论。")
+    prompt = _build_task_prompt({"task": "/stats-skill 帮我统计"}, [skill])
+    assert "已载入技能说明" in prompt
+    assert "请先运行脚本再下结论。" in prompt
+    assert "任务：/stats-skill 帮我统计" in prompt, "原始任务文本要保留"
+
+
+def test_task_prompt_without_invocation_stays_lean():
+    """没点技能时，任务提示里不该多出技能正文（渐进式披露）。"""
+
+    skill = Skill(name="stats-skill", instructions="请先运行脚本再下结论。")
+    prompt = _build_task_prompt({"task": "帮我统计"}, [skill])
+    assert "已载入技能说明" not in prompt
+
+
+async def test_slash_command_reaches_the_model(
+    make_expert_config, tool_registry, tmp_path
+):
+    """端到端：任务里的 /技能名 会把技能说明带进给模型的提示。"""
+
+    skill = _skill_with_script(tmp_path)
+    config = make_expert_config("slashed", tools=("list_skills",))
+
+    prompts: list[str] = []
+
+    class CapturingLLM(MockChat):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            prompts.append(str(messages[-1].content))
+            return super()._generate(messages, stop, run_manager, **kwargs)
+
+    graph = build_expert_graph(
+        config,
+        llm=CapturingLLM(model="mock", script=[{"content": "计划"}, {"content": "结论"}]),
+        tool_registry=tool_registry,
+        checkpointer=InMemorySaver(),
+        skills=[skill],
+    )
+    await graph.ainvoke(
+        {"task": "/stats-skill 帮我统计"}, {"configurable": {"thread_id": "slash"}}
+    )
+
+    assert prompts, "模型应该被调用过"
+    assert any("已载入技能说明" in text for text in prompts)
+    assert any("请先运行脚本再下结论。" in text for text in prompts)
+
+
+async def test_slash_command_not_bound_is_not_injected(
+    make_expert_config, tool_registry, tmp_path
+):
+    """没绑定给该专家的技能，点不动也不该被注入。"""
+
+    skill = _skill_with_script(tmp_path)
+    config = make_expert_config("noslash", tools=("list_skills",))
+
+    prompts: list[str] = []
+
+    class CapturingLLM(MockChat):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            prompts.append(str(messages[-1].content))
+            return super()._generate(messages, stop, run_manager, **kwargs)
+
+    graph = build_expert_graph(
+        config,
+        llm=CapturingLLM(model="mock", script=[{"content": "计划"}, {"content": "结论"}]),
+        tool_registry=tool_registry,
+        checkpointer=InMemorySaver(),
+        skills=[],  # 没绑定任何技能
+    )
+    await graph.ainvoke(
+        {"task": "/stats-skill 帮我统计"}, {"configurable": {"thread_id": "noslash"}}
+    )
+
+    assert not any("已载入技能说明" in text for text in prompts)

@@ -156,9 +156,36 @@
 
   .composer {
     border: 1px solid var(--border); border-radius: var(--radius); background: #fff;
-    box-shadow: var(--shadow); padding: 14px 16px 10px;
+    box-shadow: var(--shadow); padding: 14px 16px 10px; position: relative;
   }
   .composer:focus-within { border-color: var(--border2); }
+
+  /* ---------- 技能选择（输入 / 触发） ---------- */
+  .skill-menu {
+    position: absolute; left: 0; right: 0; z-index: 25;
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 6px; max-height: 300px; overflow-y: auto;
+  }
+  .skill-menu.up { bottom: calc(100% + 8px); }
+  .skill-menu.down { top: calc(100% + 8px); }
+  .skill-menu .hint-line {
+    padding: 6px 10px 4px; font-size: 11.5px; color: var(--muted);
+  }
+  .skill-item {
+    display: flex; flex-direction: column; gap: 2px; padding: 8px 10px;
+    border-radius: 9px; cursor: pointer;
+  }
+  .skill-item:hover, .skill-item.on { background: var(--bg-soft2); }
+  .skill-item .nm { font-size: 13.5px; font-weight: 600; color: var(--text); }
+  .skill-item .nm code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12.5px; background: var(--bg-soft2); padding: 1px 6px;
+    border-radius: 5px; margin-right: 6px;
+  }
+  .skill-item .ds {
+    font-size: 12px; color: var(--muted); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
   .composer textarea {
     width: 100%; border: 0; outline: 0; resize: none; background: transparent;
     font: inherit; font-size: 15px; line-height: 1.65; color: var(--text);
@@ -354,6 +381,7 @@
 
         <div id="homeComposer">
           <div class="composer" id="composer">
+            <div class="skill-menu" id="skillMenu" hidden></div>
             <textarea id="input" rows="1" placeholder="今天帮你做些什么？ @ 添加上下文，/调用技能与指令"></textarea>
             <div class="composer-bar">
               <div class="bar-left">
@@ -834,6 +862,135 @@ function toast(text) {
   toastTimer = setTimeout(() => box.classList.remove("on"), 2200);
 }
 
+/* ---------- 技能选择（输入 / 触发） ---------- */
+let skillItems = [];   // 当前菜单里的技能
+let skillIndex = 0;    // 高亮项
+
+/** 找出光标前正在输入的「/命令」。 */
+function skillCommandAt() {
+  const t = $("input");
+  const upto = t.value.slice(0, t.selectionStart);
+  const slash = upto.lastIndexOf("/");
+  if (slash < 0) return null;
+  // "/" 前面不能是别的字符（否则多半是路径）
+  const before = slash === 0 ? "" : upto[slash - 1];
+  if (before && !/\s/.test(before)) return null;
+  const query = upto.slice(slash + 1);
+  if (/\s/.test(query)) return null;   // 后面已经有空格 → 不是在输入命令
+  return { query, start: slash };
+}
+
+/** 当前目标能用的技能（其余的列出来但标灰，避免选了没反应）。 */
+function skillIsBound(skill) {
+  if (target.expert) {
+    const expert = catalog.experts.find(e => e.name === target.expert);
+    if (!expert) return true;
+    if (skill.default) return true;
+    if ((skill.agents || []).length) return skill.agents.includes(target.expert);
+    return true;
+  }
+  if (target.team) {
+    const team = catalog.teams.find(t => t.name === target.team);
+    const members = team ? team.members : [];
+    if (skill.default) return true;
+    if ((skill.agents || []).length) return skill.agents.some(a => members.includes(a));
+    return true;
+  }
+  return true;
+}
+
+function openSkillMenu(query) {
+  const box = $("skillMenu");
+  const kw = query.toLowerCase();
+  skillItems = (catalog.skills || []).filter(s =>
+    !kw || s.name.toLowerCase().includes(kw) || (s.description || "").toLowerCase().includes(kw)
+  );
+  if (!skillItems.length) {
+    closeSkillMenu();
+    return;
+  }
+  skillIndex = 0;
+  renderSkillMenu(query);
+  box.hidden = false;
+  positionSkillMenu();
+}
+
+/** 菜单贴着输入框展开：上面放得下就朝上，否则朝下。 */
+function positionSkillMenu() {
+  const box = $("skillMenu");
+  const rect = $("composer").getBoundingClientRect();
+  const above = rect.top;
+  const below = window.innerHeight - rect.bottom;
+  if (above >= below) {
+    box.classList.add("up");
+    box.classList.remove("down");
+    box.style.maxHeight = Math.max(140, Math.min(300, above - 16)) + "px";
+  } else {
+    box.classList.add("down");
+    box.classList.remove("up");
+    box.style.maxHeight = Math.max(140, Math.min(300, below - 16)) + "px";
+  }
+}
+
+function renderSkillMenu(query) {
+  const box = $("skillMenu");
+  box.innerHTML = "";
+  box.appendChild(el("div", "hint-line",
+    query ? `技能 · 匹配「${query}」` : "技能 · 选择一个带进任务（↑↓ 选择，Enter 确认，Esc 关闭）"));
+  skillItems.forEach((skill, i) => {
+    const item = el("div", "skill-item" + (i === skillIndex ? " on" : ""));
+    const bound = skillIsBound(skill);
+    item.innerHTML =
+      `<span class="nm"><code>/${esc(skill.name)}</code>${esc(skill.description || "")}` +
+      `${bound ? "" : "　<span style='color:var(--warn)'>当前专家未绑定</span>"}</span>` +
+      `<span class="ds">${esc(
+        (skill.agents || []).length ? "绑定：" + skill.agents.join("、") :
+        skill.default ? "所有专家" : "通用型专家"
+      )}</span>`;
+    item.onclick = () => applySkill(skill);
+    item.onmouseenter = () => {
+      skillIndex = i;
+      [...box.querySelectorAll(".skill-item")].forEach((n, j) => n.classList.toggle("on", j === i));
+    };
+    box.appendChild(item);
+  });
+}
+
+function closeSkillMenu() {
+  $("skillMenu").hidden = true;
+  skillItems = [];
+  skillIndex = 0;
+}
+
+function applySkill(skill) {
+  const t = $("input");
+  const hit = skillCommandAt();
+  const start = hit ? hit.start : t.selectionStart;
+  const end = t.selectionStart;
+  const token = "/" + skill.name + " ";
+  t.value = t.value.slice(0, start) + token + t.value.slice(end);
+  const pos = start + token.length;
+  t.setSelectionRange(pos, pos);
+  closeSkillMenu();
+  t.focus();
+  autosize();
+}
+
+function moveSkillCursor(delta) {
+  if (!skillItems.length) return;
+  skillIndex = (skillIndex + delta + skillItems.length) % skillItems.length;
+  const box = $("skillMenu");
+  [...box.querySelectorAll(".skill-item")].forEach((n, i) => n.classList.toggle("on", i === skillIndex));
+  const active = box.querySelector(".skill-item.on");
+  if (active) active.scrollIntoView({ block: "nearest" });
+}
+
+function syncSkillMenu() {
+  const hit = skillCommandAt();
+  if (!hit) { closeSkillMenu(); return; }
+  openSkillMenu(hit.query);
+}
+
 /* ---------- 数据加载 ---------- */
 async function loadCatalog() {
   catalog = await (await fetch("/api/catalog")).json();
@@ -859,9 +1016,22 @@ async function loadHealth() {
 /* ---------- 事件绑定 ---------- */
 $("sendBtn").onclick = send;
 $("input").addEventListener("keydown", (e) => {
+  // 技能菜单开着时，方向键/回车归菜单管
+  if (!$("skillMenu").hidden && skillItems.length) {
+    if (e.key === "ArrowDown") { e.preventDefault(); moveSkillCursor(1); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); moveSkillCursor(-1); return; }
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      applySkill(skillItems[skillIndex]);
+      return;
+    }
+    if (e.key === "Escape") { e.preventDefault(); closeSkillMenu(); return; }
+  }
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });
-$("input").addEventListener("input", autosize);
+$("input").addEventListener("input", () => { autosize(); syncSkillMenu(); });
+$("input").addEventListener("click", syncSkillMenu);
+$("input").addEventListener("blur", () => setTimeout(closeSkillMenu, 120));
 
 $("newTaskBtn").onclick = () => { newTask(); setSideView("recent"); };
 $("catalogBtn").onclick = () => setSideView(sideView === "catalog" ? "recent" : "catalog");
