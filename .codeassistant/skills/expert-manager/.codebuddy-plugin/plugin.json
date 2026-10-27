@@ -1,0 +1,24 @@
+{
+  "name": "skill-expert-manager",
+  "version": "5.7.7-wb.40774747.g2e8619da.he0b77ffa23f7",
+  "description": "WorkBuddy bundled skill resource: expert-manager.",
+  "author": {
+    "name": "WorkBuddy"
+  },
+  "category": "skill",
+  "keywords": [
+    "workbuddy",
+    "builtin-skill",
+    "expert-manager"
+  ],
+  "workbuddy": {
+    "kind": "builtin-skill",
+    "legacyResourceName": "expert-manager",
+    "bundleSegments": [
+      "plugins",
+      "workbuddy-builtin",
+      "skills",
+      "expert-manager"
+    ]
+  }
+}
